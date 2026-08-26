@@ -16,43 +16,18 @@ Clriks-cli là giao diện **Agent IDE Shell** mô phỏng trải nghiệm Termu
 ## Lệnh demo
 
 ```text
-help
-pkg update
-pkg install python openai
-pkg list
-setup web react github agent
-env python fastapi ai
-ls
-mkdir demo
-cd ~/config
-cat keys.demo.env
 login
-set repo owner/project
-agent task thêm API kết nối GitHub
-agent pr sửa lỗi giao diện dashboard
+task thêm API kết nối GitHub
+pr sửa lỗi giao diện dashboard
 bash gh pr list
 review 12
-clear
+set repo owner/project
+set memory 256MB
 ```
-
-## File mẫu để dán key/API
-
-- `config/keys.demo.env`: mẫu biến môi trường để bạn copy thành `.env.local` và dán GitHub/OpenAI key thật ở backend.
-- `agent/api-agent.demo.js`: mẫu module Node.js cho agent API, prompt builder và allowlist lệnh shell an toàn.
-
-## Tự động hoá setup môi trường
-
-Người dùng có thể nhập tiêu đề hoặc từ khoá tự nhiên, ví dụ `setup web react github agent`, `env python fastapi ai`, hoặc `setup mobile android termux`. UI sẽ sinh kế hoạch môi trường gồm:
-
-- Stack phù hợp với từ khoá.
-- Danh sách package cần cài.
-- File scaffold nên tạo.
-- Lệnh bootstrap tiếp theo.
-- Checklist bảo mật trước khi chạy thật trên backend.
 
 ## Kiến trúc backend đề xuất
 
-Frontend tĩnh chỉ nên là console điều khiển. Phần thực thi thật nên nằm trong backend Node.js/Python để bảo vệ secret và giới hạn quyền:
+Frontend tĩnh nên gọi một backend Node.js/Python bảo vệ secret và quyền ghi repository:
 
 1. `/auth/device-code` và `/auth/poll` gọi GitHub OAuth Device Authorization Grant.
 2. `/agent/plan` gọi LLM với yêu cầu trả JSON có cấu trúc.
