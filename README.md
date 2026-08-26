@@ -1,4 +1,5 @@
-[![Preview of Lộ trình AI Agent Clriks-cli](https://www.deeplyclear.com/m/dfdbcb26-6113-4b83-9e90-db88c25c511c/preview.png?v=1787732363528)](https://www.deeplyclear.com/m/dfdbcb26-6113-4b83-9e90-db88c25c511c?mode=tour)
+[![Preview of Clarity Tour](https://www.deeplyclear.com/m/dfdbcb26-6113-4b83-9e90-db88c25c511c/preview.png?v=1787732363528)](docs/CLARITY_TOUR.md)
+
 Frontend tĩnh nên gọi một backend Node.js/Python bảo vệ secret và quyền ghi repository:
 
 Clriks-cli là giao diện **Agent IDE Shell** mô phỏng trải nghiệm Termux/shell ngay trong UI web, đồng thời tích hợp luồng agent để tự động hóa GitHub giống Codex.
@@ -36,4 +37,11 @@ set memory 256MB
 
 ## Lưu ý bảo mật
 
-Không đưa key thật vào `index.html`. Hãy copy `config/keys.demo.env` thành file local/private và để backend đọc bằng biến môi trường. Shell production cần allowlist, timeout, container sandbox và xác nhận người dùng trước các thao tác ghi như commit/push/PR.
+Không đưa key thật vào `index.html`. Hãy copy `config/keys.demo.env` thành file local/private và để backend đọc bằng biến môi trường. Shell production cần allowlist, timeout, container sandbox và confirmation trước khi ghi repository.
+
+## Clarity Tour
+
+Xem tài liệu tham quan kỹ thuật (Clarity Tour) để có bản trình bày từng bước, schema và hướng dẫn xem tour:
+
+- docs/CLARITY_TOUR.md
+
