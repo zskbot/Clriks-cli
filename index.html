@@ -3,111 +3,249 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ClaudeRiks IDE - IBM Terminal</title>
+    <title>Clriks-cli Agent IDE Shell</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'IBM Plex Mono', monospace;
-            background-color: #000;
-            color: #e0e0e0;
-        }
-        .glossy-panel {
-            background: linear-gradient(145deg, #161616, #050505);
-            border: 1px solid #393939;
-        }
-        .terminal-scroll::-webkit-scrollbar {
-            width: 4px;
-        }
-        .terminal-scroll::-webkit-scrollbar-thumb {
-            background: #393939;
-        }
-        .btn-ibm {
-            transition: all 0.2s ease;
-            border: 1px solid #393939;
-        }
-        .btn-ibm:active {
-            background-color: #0f62fe;
-            color: white;
-            border-color: #0f62fe;
-        }
-        .cursor-blink {
-            animation: blink 1s infinite;
-        }
-        @keyframes blink { 50% { opacity: 0; } }
+        body { font-family: 'IBM Plex Mono', monospace; background:#000; color:#e0e0e0; }
+        .glossy-panel { background:linear-gradient(145deg,#161616,#050505); border:1px solid #393939; box-shadow:0 18px 48px rgba(15,98,254,.08); }
+        .terminal-scroll::-webkit-scrollbar { width:4px; } .terminal-scroll::-webkit-scrollbar-thumb { background:#393939; }
+        .btn-ibm { transition:all .2s ease; border:1px solid #393939; } .btn-ibm:hover,.btn-ibm.active{ background:#0f62fe22; border-color:#0f62fe; color:#fff; }
+        .status-dot{ width:.5rem; height:.5rem; border-radius:999px; display:inline-block; margin-right:.35rem; }
+        .drawer{ transform:translateX(105%); transition:transform .22s ease; } .drawer.open{ transform:translateX(0); }
+        .overlay{ opacity:0; pointer-events:none; transition:opacity .22s ease; } .overlay.open{ opacity:1; pointer-events:auto; }
     </style>
 </head>
-<body class="p-4 max-w-md mx-auto">
-
-    <!-- Header: System Status -->
-    <header class="mb-6 flex justify-between items-center border-b border-[#393939] pb-2">
-        <div class="text-[10px] uppercase tracking-widest text-[#8d8d8d]">
-            System: <span class="text-[#0f62fe]">Active</span>
+<body class="p-4 max-w-md mx-auto min-h-screen relative overflow-x-hidden">
+    <div id="drawer-overlay" class="overlay fixed inset-0 bg-black/70 z-40"></div>
+    <aside id="drawer" class="drawer fixed top-0 right-0 z-50 h-full w-80 max-w-[86vw] glossy-panel p-4 overflow-y-auto" aria-label="Menu mở rộng">
+        <div class="flex items-center justify-between border-b border-[#393939] pb-3 mb-4">
+            <div><p class="text-sm font-bold uppercase">Clriks Menu</p><p class="text-[10px] text-[#8d8d8d]">Agent IDE + Termux style shell</p></div>
+            <button id="close-menu" class="btn-ibm px-3 py-2">×</button>
         </div>
-        <div class="text-[10px] uppercase tracking-widest text-[#8d8d8d]">
-            Nodes: 04 | 2.43 Mbps
+        <div id="drawer-pages" class="space-y-2"></div>
+    </aside>
+
+    <header class="mb-5 flex justify-between items-center border-b border-[#393939] pb-2">
+        <div class="text-[10px] uppercase tracking-widest text-[#8d8d8d]">System: <span id="auth-state" class="text-[#f1c21b]">Guest</span></div>
+        <div class="flex items-center gap-2">
+            <span class="text-[10px] uppercase tracking-widest text-[#8d8d8d]">Agent: <b class="text-[#0f62fe]">IDE SHELL</b></span>
+            <button id="open-menu" class="btn-ibm px-3 py-2 text-lg leading-none" aria-label="Mở menu">☰</button>
         </div>
     </header>
 
-    <!-- Execution Log (Nhật ký thực thi) -->
-    <section class="glossy-panel h-64 p-3 mb-6 relative overflow-hidden">
+    <section class="glossy-panel h-80 p-3 mb-4 relative overflow-hidden" aria-label="Nhật ký terminal">
         <div class="absolute top-0 left-0 w-full h-1 bg-[#0f62fe] opacity-50"></div>
-        <div class="terminal-scroll h-full overflow-y-auto text-xs space-y-1">
-            <p class="text-[#8d8d8d]">[02:43:01] Initializing GitHub Auth...</p>
-            <p class="text-[#24a148]">[OK] Authenticated as @ClaudeRiks</p>
-            <p class="text-[#8d8d8d]">[02:43:05] Fetching Pull Requests...</p>
-            <p class="text-[#f1c21b]">[WARN] Latency detected in Asia-East-1</p>
-            <p class="text-white">usr@local:~$ gh dash --view dashboard</p>
-            <p class="text-[#0f62fe] animate-pulse">>> Syncing Cloud Database...</p>
-            <p class="text-white">_ <span class="cursor-blink">|</span></p>
-        </div>
+        <div id="terminal-log" class="terminal-scroll h-full overflow-y-auto text-xs space-y-1 pr-1" role="log" aria-live="polite"></div>
     </section>
 
-    <!-- Action Grid (Nút vuông góc cạnh) -->
-    <nav class="grid grid-cols-2 gap-2">
-        <button class="btn-ibm p-4 flex flex-col items-start space-y-2 bg-[#161616]">
-            <span class="text-[10px] text-[#8d8d8d] font-bold">01</span>
-            <span class="text-sm font-semibold uppercase">Tài liệu</span>
-        </button>
-        <button class="btn-ibm p-4 flex flex-col items-start space-y-2 bg-[#161616]">
-            <span class="text-[10px] text-[#8d8d8d] font-bold">02</span>
-            <span class="text-sm font-semibold uppercase">Cấu hình</span>
-        </button>
-        <button class="btn-ibm p-4 flex flex-col items-start space-y-2 bg-[#161616]">
-            <span class="text-[10px] text-[#8d8d8d] font-bold">03</span>
-            <span class="text-sm font-semibold uppercase">API Kết nối</span>
-        </button>
-        <button class="btn-ibm p-4 flex flex-col items-start space-y-2 bg-[#161616]">
-            <span class="text-[10px] text-[#8d8d8d] font-bold">04</span>
-            <span class="text-sm font-semibold uppercase">Cộng đồng</span>
-        </button>
+    <section class="grid grid-cols-2 gap-2 mb-4 text-[10px]">
+        <button data-run="pkg update" class="btn-ibm glossy-panel p-3 text-left"><span class="status-dot bg-[#3fb950]"></span>pkg update</button>
+        <button data-run="pkg install nodejs" class="btn-ibm glossy-panel p-3 text-left"><span class="status-dot bg-[#0f62fe]"></span>install nodejs</button>
+        <button data-run="agent pr sửa UI" class="btn-ibm glossy-panel p-3 text-left"><span class="status-dot bg-[#be95ff]"></span>agent create PR</button>
+        <button data-run="review 12" class="btn-ibm glossy-panel p-3 text-left"><span class="status-dot bg-[#f1c21b]"></span>review PR</button>
+    </section>
+
+    <nav class="grid grid-cols-2 gap-2" aria-label="Trang UI/UX bổ sung">
+        <button data-panel="docs" class="btn-ibm p-4 flex flex-col items-start space-y-2 bg-[#161616]"><span class="text-[10px] text-[#8d8d8d] font-bold">01</span><span class="text-sm font-semibold uppercase">Tài liệu</span></button>
+        <button data-panel="packages" class="btn-ibm p-4 flex flex-col items-start space-y-2 bg-[#161616]"><span class="text-[10px] text-[#8d8d8d] font-bold">02</span><span class="text-sm font-semibold uppercase">Packages</span></button>
+        <button data-panel="agent" class="btn-ibm p-4 flex flex-col items-start space-y-2 bg-[#161616]"><span class="text-[10px] text-[#8d8d8d] font-bold">03</span><span class="text-sm font-semibold uppercase">Agent IDE</span></button>
+        <button data-panel="environment" class="btn-ibm p-4 flex flex-col items-start space-y-2 bg-[#161616]"><span class="text-[10px] text-[#8d8d8d] font-bold">04</span><span class="text-sm font-semibold uppercase">Setup Env</span></button>
     </nav>
 
-    <!-- Execution Input (Giả lập thực thi lệnh) -->
     <section class="mt-6">
-        <div class="relative">
+        <div class="relative flex gap-2">
             <span class="absolute left-3 top-3 text-[#0f62fe]">$</span>
-            <input type="text" 
-                   class="w-full bg-[#161616] border border-[#393939] p-3 pl-8 text-sm focus:outline-none focus:border-[#0f62fe] placeholder-[#525252]"
-                   placeholder="Nhập lệnh thực thi (e.g. --sync)">
+            <input id="command-input" type="text" class="w-full bg-[#161616] border border-[#393939] p-3 pl-8 text-sm focus:outline-none focus:border-[#0f62fe] placeholder-[#525252]" placeholder="setup ai agent | env node api | pkg install python | agent task ...">
+            <button id="send-command" class="btn-ibm bg-[#0f62fe] px-4 text-sm font-bold" aria-label="Gửi lệnh">↵</button>
         </div>
     </section>
 
-    <!-- Footer Stats -->
     <footer class="mt-8 grid grid-cols-3 gap-1 border-t border-[#393939] pt-4">
-        <div class="text-center border-r border-[#393939]">
-            <p class="text-[8px] text-[#8d8d8d] uppercase italic">Memory</p>
-            <p class="text-xs font-bold">128MB</p>
-        </div>
-        <div class="text-center border-r border-[#393939]">
-            <p class="text-[8px] text-[#8d8d8d] uppercase italic">Uptime</p>
-            <p class="text-xs font-bold">99.9%</p>
-        </div>
-        <div class="text-center">
-            <p class="text-[8px] text-[#8d8d8d] uppercase italic">Region</p>
-            <p class="text-xs font-bold">VN-S1</p>
-        </div>
+        <div class="text-center border-r border-[#393939]"><p class="text-[8px] text-[#8d8d8d] uppercase italic">Memory</p><p id="memory-stat" class="text-xs font-bold">256MB</p></div>
+        <div class="text-center border-r border-[#393939]"><p class="text-[8px] text-[#8d8d8d] uppercase italic">Path</p><p id="path-stat" class="text-xs font-bold">~</p></div>
+        <div class="text-center"><p class="text-[8px] text-[#8d8d8d] uppercase italic">Packages</p><p id="pkg-stat" class="text-xs font-bold">0</p></div>
     </footer>
 
+<script>
+const state = {
+  token: localStorage.getItem('clriks.githubToken') || '',
+  repo: localStorage.getItem('clriks.repo') || 'owner/repo',
+  memory: localStorage.getItem('clriks.memory') || '256MB',
+  cwd: localStorage.getItem('clriks.cwd') || '~',
+  packages: JSON.parse(localStorage.getItem('clriks.packages') || '["git","gh","nodejs"]'),
+  files: JSON.parse(localStorage.getItem('clriks.files') || '{"~":["README.md","app/","config/","agent/"],"~/app":["index.html","src/"],"~/config":["keys.demo.env"],"~/agent":["api-agent.demo.js"]}')
+};
+
+const pages = {
+  docs: ['HELP', 'pkg update | pkg upgrade | pkg install <name> | pkg remove <name>', 'ls | pwd | cd <dir> | mkdir <dir> | touch <file> | cat <file> | echo <text>', 'login | set repo owner/name | agent task ... | agent pr ... | review <id>', 'clear để xoá terminal.'],
+  packages: ['PACKAGE CENTER', 'Install queue mô phỏng Termux/pkg/apt.', 'Gói sẵn: git, gh, nodejs, python, openai, octokit, eslint, vite.', 'Ví dụ: pkg install python openai hoặc apt update.'],
+  agent: ['AGENT IDE', 'Agent đọc lệnh tự nhiên, trả JSON action, rồi backend thật mới thực thi.', 'Workflow: Task → Branch → Edit → Test → Commit → Push → PR → Review.', 'File mẫu key: config/keys.demo.env. File chat/api agent: agent/api-agent.demo.js.'],
+  environment: ['AUTO ENV SETUP', 'Nhập setup <tiêu đề> hoặc env <từ khoá> để agent tự đề xuất stack.', 'Ví dụ: setup web react github agent, env python fastapi ai, setup node api cli.', 'Kết quả gồm package cần cài, file cần tạo, lệnh khởi tạo và checklist bảo mật.'],
+  settings: ['SETTINGS', 'set repo owner/project để đổi repo.', 'set memory 512MB để đổi memory.', 'Secret thật chỉ nên nằm trong backend/.env, không lưu ở frontend production.'],
+  roadmap: ['ROADMAP', '1. Backend sandbox shell streaming.', '2. GitHub OAuth Device Flow thật.', '3. OpenAI/LLM function calling.', '4. Workspace file editor.', '5. Audit log + permission prompt trước khi push.'],
+  security: ['SECURITY', 'Không cho phép rm -rf, curl | sh, sudo, chmod 777 trong shell demo.', 'Production cần container sandbox, timeout, allowlist và review trước khi push.']
+};
+
+const packageCatalog = ['git','gh','nodejs','python','openai','octokit','eslint','vite','nano','curl','wget','typescript'];
+function saveState(){ localStorage.setItem('clriks.packages', JSON.stringify(state.packages)); localStorage.setItem('clriks.files', JSON.stringify(state.files)); localStorage.setItem('clriks.cwd', state.cwd); }
+function stamp(){ return new Date().toLocaleTimeString('vi-VN', { hour12:false }); }
+function escapeHtml(value){ return String(value).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+function logLine(message, color = 'text-[#8d8d8d]'){
+  const log = document.getElementById('terminal-log');
+  const line = document.createElement('p');
+  line.className = color;
+  line.innerHTML = `[${stamp()}] ${message}`;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}
+function syncStats(){
+  document.getElementById('auth-state').textContent = state.token ? 'GitHub Authenticated' : 'Guest';
+  document.getElementById('auth-state').className = state.token ? 'text-[#24a148]' : 'text-[#f1c21b]';
+  document.getElementById('memory-stat').textContent = state.memory;
+  document.getElementById('path-stat').textContent = state.cwd.replace('~/', '');
+  document.getElementById('pkg-stat').textContent = state.packages.length;
+}
+function openDrawer(){ document.getElementById('drawer').classList.add('open'); document.getElementById('drawer-overlay').classList.add('open'); }
+function closeDrawer(){ document.getElementById('drawer').classList.remove('open'); document.getElementById('drawer-overlay').classList.remove('open'); }
+function renderDrawer(){
+  document.getElementById('drawer-pages').innerHTML = Object.keys(pages).map(name => `<button data-panel="${name}" class="btn-ibm w-full p-3 text-left bg-[#161616]"><b>${name.toUpperCase()}</b><br><span class="text-[10px] text-[#8d8d8d]">${escapeHtml(pages[name][1])}</span></button>`).join('');
+}
+function renderPanel(name){
+  document.querySelectorAll('[data-panel]').forEach(btn => btn.classList.toggle('active', btn.dataset.panel === name));
+  logLine(`UI PAGE → ${name.toUpperCase()}`, 'text-[#0f62fe]');
+  pages[name].forEach((item, idx) => logLine(escapeHtml(item), idx === 0 ? 'text-white' : 'text-[#8d8d8d]'));
+  closeDrawer();
+}
+function simulateDeviceFlow(){
+  const code = 'CLR-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+  logLine('POST /auth/device-code → GitHub Device Flow', 'text-white');
+  logLine(`Mở https://github.com/login/device và nhập mã <b>${code}</b>`, 'text-[#f1c21b]');
+  setTimeout(() => { state.token = 'gho_demo_token_' + Date.now(); localStorage.setItem('clriks.githubToken', state.token); syncStats(); logLine('[OK] OAuth demo authenticated.', 'text-[#24a148]'); }, 1200);
+}
+function runPackageCommand(args){
+  const sub = args[0];
+  if(['update','upgrade'].includes(sub)) return logLine(`[OK] ${sub}: fetched package index, ${state.packages.length} packages checked.`, 'text-[#24a148]');
+  if(['install','add'].includes(sub)){
+    const names = args.slice(1).filter(Boolean);
+    names.forEach(name => { if(!state.packages.includes(name)) state.packages.push(name); });
+    saveState(); syncStats();
+    return logLine(`[OK] installed: ${names.join(', ') || 'no package'} from Clriks repo.`, 'text-[#24a148]');
+  }
+  if(['remove','uninstall'].includes(sub)){
+    const names = args.slice(1); state.packages = state.packages.filter(pkg => !names.includes(pkg)); saveState(); syncStats();
+    return logLine(`[OK] removed: ${names.join(', ') || 'no package'}.`, 'text-[#f1c21b]');
+  }
+  if(['list','search'].includes(sub)) return logLine(packageCatalog.map(pkg => `${state.packages.includes(pkg) ? '✓' : ' '} ${pkg}`).join(' · '), 'text-white');
+  logLine('Usage: pkg update | pkg upgrade | pkg install <name> | pkg remove <name> | pkg list', 'text-[#f1c21b]');
+}
+function runFileCommand(cmd, args){
+  const entries = state.files[state.cwd] || [];
+  if(cmd === 'pwd') return logLine(state.cwd, 'text-white');
+  if(cmd === 'ls') return logLine(entries.join('  ') || '(empty)', 'text-white');
+  if(cmd === 'cd'){
+    const target = args[0] || '~';
+    const next = target === '~' ? '~' : target.startsWith('~/') ? target : state.cwd + '/' + target.replace(/\/$/, '');
+    if(state.files[next]){ state.cwd = next; saveState(); syncStats(); return logLine(state.cwd, 'text-white'); }
+    return logLine(`cd: no such directory: ${escapeHtml(target)}`, 'text-[#f85149]');
+  }
+  if(cmd === 'mkdir'){
+    const name = args[0]; if(!name) return logLine('mkdir: missing operand', 'text-[#f85149]');
+    const path = state.cwd + '/' + name; state.files[path] = []; if(!entries.includes(name + '/')) entries.push(name + '/'); saveState();
+    return logLine(`[OK] created directory ${escapeHtml(path)}`, 'text-[#24a148]');
+  }
+  if(cmd === 'touch'){
+    const name = args[0]; if(!name) return logLine('touch: missing file operand', 'text-[#f85149]');
+    if(!entries.includes(name)) entries.push(name); saveState(); return logLine(`[OK] touched ${escapeHtml(name)}`, 'text-[#24a148]');
+  }
+  if(cmd === 'cat') return logLine(`demo file ${escapeHtml(args[0] || '')}: paste API keys in config/keys.demo.env; agent skeleton in agent/api-agent.demo.js`, 'text-white');
+  if(cmd === 'echo') return logLine(escapeHtml(args.join(' ')), 'text-white');
+}
+function buildEnvironmentPlan(title){
+  const lower = title.toLowerCase();
+  const plan = {
+    title: title || 'generic agent workspace',
+    stack: 'node-agent-cli',
+    packages: ['git','gh','nodejs','openai','octokit'],
+    files: ['.env.local','agent/server.js','src/index.js','README.md'],
+    commands: ['pkg update','pkg install git gh nodejs','npm init -y','npm install openai @octokit/rest'],
+    checks: ['verify API keys in .env.local','run unit tests','confirm before git push']
+  };
+  if(lower.includes('python') || lower.includes('fastapi')){
+    plan.stack = 'python-fastapi-agent';
+    plan.packages = ['git','gh','python','pip','uvicorn'];
+    plan.files = ['.env.local','agent/main.py','requirements.txt','README.md'];
+    plan.commands = ['pkg update','pkg install python git gh','python -m venv .venv','pip install fastapi uvicorn openai PyGithub'];
+  }
+  if(lower.includes('react') || lower.includes('web')){
+    plan.stack = 'react-agent-dashboard';
+    plan.packages = ['git','gh','nodejs','vite','typescript'];
+    plan.files = ['.env.local','src/App.jsx','src/agentClient.js','vite.config.js'];
+    plan.commands = ['pkg update','pkg install nodejs git gh','npm create vite@latest clriks-agent -- --template react','npm install openai @octokit/rest'];
+  }
+  if(lower.includes('mobile') || lower.includes('android')){
+    plan.stack = 'mobile-termux-agent';
+    plan.packages = ['git','gh','nodejs','termux-api','python'];
+    plan.files = ['.env.local','agent/mobile-shell.js','scripts/bootstrap.sh'];
+    plan.commands = ['pkg update','pkg install termux-api nodejs python git gh','npm install openai @octokit/rest'];
+  }
+  return plan;
+}
+function runEnvironmentSetup(title){
+  const plan = buildEnvironmentPlan(title);
+  logLine('ENV_SETUP plan → <code>' + escapeHtml(JSON.stringify(plan)) + '</code>', 'text-[#be95ff]');
+  plan.packages.forEach(pkg => { if(!state.packages.includes(pkg)) state.packages.push(pkg); });
+  const envDir = '~/env-' + plan.stack;
+  state.files[envDir] = plan.files;
+  if(!state.files['~'].includes('env-' + plan.stack + '/')) state.files['~'].push('env-' + plan.stack + '/');
+  saveState(); syncStats();
+  logLine(`[OK] Stack: ${escapeHtml(plan.stack)} | packages queued: ${escapeHtml(plan.packages.join(', '))}`, 'text-[#24a148]');
+  logLine(`Files scaffold: ${escapeHtml(plan.files.join('  '))}`, 'text-white');
+  logLine(`Next commands: ${escapeHtml(plan.commands.join(' && '))}`, 'text-[#0f62fe]');
+  logLine(`Security checklist: ${escapeHtml(plan.checks.join(' → '))}`, 'text-[#f1c21b]');
+}
+function planWithAgent(text){
+  const lower = text.toLowerCase();
+  if(lower.includes('task')) return { action:'CREATE_TASK', repo:state.repo, title:text.replace(/^agent\s+task\s*/i,'Task: '), safety:'confirm-before-write' };
+  if(lower.includes('pr')) return { action:'CREATE_PR', repo:state.repo, branch:'agent/' + Date.now(), commands:['git checkout -b','edit files','npm test','git commit','git push','gh pr create'], safety:'sandboxed' };
+  return { action:'CHAT_OR_CODE', repo:state.repo, files_to_edit:['index.html'], safety:'needs-user-confirmation', summary:text };
+}
+function runAgentCommand(text){
+  const plan = planWithAgent(text);
+  logLine('LLM function_call → <code>' + escapeHtml(JSON.stringify(plan)) + '</code>', 'text-[#be95ff]');
+  if(plan.action === 'CREATE_PR') logLine('Agent IDE queue: open editor → apply patch → run tests → create PR.', 'text-[#0f62fe]');
+  if(plan.action === 'CREATE_TASK') logLine(`Octokit issues.create repo=${escapeHtml(plan.repo)} title=${escapeHtml(plan.title)}`, 'text-[#24a148]');
+}
+function executeCommand(raw){
+  const command = raw.trim(); if(!command) return;
+  logLine(`<span class="text-white">u0@clriks:${escapeHtml(state.cwd)}$ ${escapeHtml(command)}</span>`, 'text-white');
+  const [cmd, ...args] = command.split(/\s+/);
+  if(cmd === 'clear'){ document.getElementById('terminal-log').innerHTML = ''; return; }
+  if(cmd === 'help') return renderPanel('docs');
+  if(cmd === 'env' || cmd === 'setup') return runEnvironmentSetup(args.join(' '));
+  if(cmd === 'login') return simulateDeviceFlow();
+  if(cmd === 'set' && args[0] === 'repo'){ state.repo = args[1] || state.repo; localStorage.setItem('clriks.repo', state.repo); return logLine(`[OK] repo=${escapeHtml(state.repo)}`, 'text-[#24a148]'); }
+  if(cmd === 'set' && args[0] === 'memory'){ state.memory = args[1] || state.memory; localStorage.setItem('clriks.memory', state.memory); syncStats(); return logLine(`[OK] memory=${escapeHtml(state.memory)}`, 'text-[#24a148]'); }
+  if(cmd === 'pkg' || cmd === 'apt' || cmd === 'install' || cmd === 'update') return runPackageCommand(cmd === 'pkg' || cmd === 'apt' ? args : [cmd, ...args]);
+  if(['pwd','ls','cd','mkdir','touch','cat','echo'].includes(cmd)) return runFileCommand(cmd, args);
+  if(cmd === 'agent' || cmd === 'task' || cmd === 'pr') return runAgentCommand(command.replace(/^agent\s*/i, ''));
+  if(cmd === 'review') return logLine(`gh pr diff ${escapeHtml(args[0] || 'current')} → LLM review → GitHub review comment`, 'text-[#24a148]');
+  if(cmd === 'bash') return logLine(`sandbox stdout/stderr: ${escapeHtml(args.join(' '))}`, 'text-[#f1c21b]');
+  logLine(`command not found: ${escapeHtml(cmd)}. Gõ help để xem lệnh hỗ trợ.`, 'text-[#f85149]');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderDrawer(); syncStats();
+  logLine('Clriks Termux-like Agent IDE booting...', 'text-[#8d8d8d]');
+  logLine('[OK] Shell commands, package manager, menu 3 gạch và Agent IDE đã sẵn sàng.', 'text-[#24a148]');
+  logLine('Gõ help, setup ai agent, env react github bot, pkg install python hoặc agent pr sửa UI.', 'text-white');
+  document.getElementById('command-input').addEventListener('keydown', e => { if(e.key === 'Enter'){ executeCommand(e.target.value); e.target.value = ''; } });
+  document.getElementById('send-command').addEventListener('click', () => { const input = document.getElementById('command-input'); executeCommand(input.value); input.value = ''; input.focus(); });
+  document.getElementById('open-menu').addEventListener('click', openDrawer);
+  document.getElementById('close-menu').addEventListener('click', closeDrawer);
+  document.getElementById('drawer-overlay').addEventListener('click', closeDrawer);
+  document.addEventListener('click', e => { const btn = e.target.closest('[data-panel]'); if(btn) renderPanel(btn.dataset.panel); const run = e.target.closest('[data-run]'); if(run) executeCommand(run.dataset.run); });
+});
+</script>
 </body>
 </html>
