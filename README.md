@@ -26,7 +26,7 @@ set memory 256MB
 ```
 
 ## Kiến trúc backend đề xuất
-
+[![Preview of Lộ trình AI Agent Clriks-cli](https://www.deeplyclear.com/m/dfdbcb26-6113-4b83-9e90-db88c25c511c/preview.png?v=1787732363528)](https://www.deeplyclear.com/m/dfdbcb26-6113-4b83-9e90-db88c25c511c?mode=tour)
 Frontend tĩnh nên gọi một backend Node.js/Python bảo vệ secret và quyền ghi repository:
 
 1. `/auth/device-code` và `/auth/poll` gọi GitHub OAuth Device Authorization Grant.
