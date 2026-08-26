@@ -13,7 +13,7 @@ const server = app.listen(PORT, () => {
     console.log(`[Hệ thống] Backend đang chạy tại http://localhost:${PORT}`);
 });
 
-// Khởi chạy WebSocket Server kết nối tới giao diện Web của bạn
+// Khởi chạy WebSocket Server kết nối tới giao diện Web
 const wss = new WebSocketServer({ server });
 
 wss.on('connection', (ws: WebSocket) => {
