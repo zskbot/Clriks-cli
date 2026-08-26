@@ -1,4 +1,5 @@
-# Clriks-cli
+[![Preview of Lộ trình AI Agent Clriks-cli](https://www.deeplyclear.com/m/dfdbcb26-6113-4b83-9e90-db88c25c511c/preview.png?v=1787732363528)](https://www.deeplyclear.com/m/dfdbcb26-6113-4b83-9e90-db88c25c511c?mode=tour)
+Frontend tĩnh nên gọi một backend Node.js/Python bảo vệ secret và quyền ghi repository:
 
 Clriks-cli là giao diện **Agent IDE Shell** mô phỏng trải nghiệm Termux/shell ngay trong UI web, đồng thời tích hợp luồng agent để tự động hóa GitHub giống Codex.
 
