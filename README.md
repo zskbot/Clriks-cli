@@ -1,12 +1,16 @@
 # Clriks-cli
 
-Giao diện Clriks-cli hiện là một Agent Console tĩnh mô phỏng luồng tự động hóa GitHub giống Codex:
+Clriks-cli là giao diện **Agent IDE Shell** mô phỏng trải nghiệm Termux/shell ngay trong UI web, đồng thời tích hợp luồng agent để tự động hóa GitHub giống Codex.
 
-- GitHub OAuth Device Flow (`login`) với mã xác nhận và polling token.
-- Router lệnh tự nhiên qua mô phỏng LLM function calling.
-- Các action cốt lõi: tạo Task/GitHub Issue, tạo PR, chạy Bash và review code.
-- SPA panel cho Tài liệu, Cấu hình, API Kết nối và Cộng đồng.
-- Đồng bộ trạng thái repo, token demo, memory và region qua `localStorage`.
+## Tính năng UI hiện có
+
+- Terminal log động với prompt kiểu shell (`u0@clriks:~$`).
+- Package manager demo giống Termux: `pkg update`, `pkg upgrade`, `pkg install`, `pkg remove`, `pkg list`.
+- File-system command demo: `ls`, `pwd`, `cd`, `mkdir`, `touch`, `cat`, `echo`, `clear`.
+- Agent IDE command: `agent task ...`, `agent pr ...`, `review <pr>`, `bash <command>`.
+- Menu 3 gạch mở drawer bên phải với các trang Docs, Packages, Agent IDE, Settings, Roadmap và Security.
+- Quick action buttons để chạy nhanh `pkg update`, `pkg install nodejs`, tạo PR bằng agent và review PR.
+- Trạng thái shell được lưu bằng `localStorage`: package đã cài, thư mục hiện tại, repo, token demo và memory.
 
 ## Lệnh demo
 
@@ -28,3 +32,8 @@ Frontend tĩnh nên gọi một backend Node.js/Python bảo vệ secret và quy
 2. `/agent/plan` gọi LLM với yêu cầu trả JSON có cấu trúc.
 3. `/github/issues`, `/github/pulls`, `/github/reviews` thực thi qua Octokit hoặc GitHub CLI.
 4. `/bash/run` stream `stdout`/`stderr` từ process sandboxed về terminal log.
+5. `/packages/install` chạy package manager trong container hoặc VM sandbox thay vì chạy trực tiếp trên host.
+
+## Lưu ý bảo mật
+
+Không đưa key thật vào `index.html`. Hãy copy `config/keys.demo.env` thành file local/private và để backend đọc bằng biến môi trường. Shell production cần allowlist, timeout, container sandbox và xác nhận người dùng trước các thao tác ghi như commit/push/PR.
