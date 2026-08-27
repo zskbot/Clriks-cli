@@ -241,9 +241,12 @@ function executeCommand(raw){
         );
       }
 
-      if (typeof socket === 'undefined' || socket.readyState !== WebSocket.OPEN) {
+      if (
+        !window.clriksSocket ||
+        window.clriksSocket.readyState !== WebSocket.OPEN
+      ) {
         return logLine(
-          '[Design] WebSocket backend chưa kết nối.',
+          '[Design] WebSocket backend chưa kết nối — đang tự kết nối lại...',
           'text-[#da1e28]'
         );
       }
@@ -253,7 +256,7 @@ function executeCommand(raw){
         'text-[#24a148]'
       );
 
-      socket.send(command);
+      window.clriksSocket.send(command);
       return;
     }
 
