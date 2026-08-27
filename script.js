@@ -1,5 +1,13 @@
 // Kết nối tới Backend Node.js đang chạy ở máy tính cá nhân của bạn
-const socket = new WebSocket('ws://localhost:3000');
+const CLRICKS_BACKEND_URL =
+    window.CLRICKS_BACKEND_URL ||
+    'https://united-leasing-tmp-neural.trycloudflare.com';
+
+const CLRICKS_WS_URL =
+    CLRICKS_BACKEND_URL.replace(/^http:/, 'ws:')
+                      .replace(/^https:/, 'wss:');
+
+const socket = new WebSocket(CLRICKS_WS_URL);
 const inputElement = document.querySelector('input'); // Ô nhập lệnh màu xanh trong ảnh
 const consoleLogElement = document.querySelector('.console-log-box'); // Vùng hiển thị log chữ xanh
 
