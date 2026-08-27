@@ -16,75 +16,36 @@ const consoleLogElement =
     document.querySelector('.console-log-box');
 
 function appendConsole(text, type = 'stdout') {
-    const message = `[${new Date().toLocaleTimeString()}] ${text}`;
+    const message = String(text ?? '');
+
+    let css = 'text-[#a6e22e]';
+
+    if (type === 'stderr' || type === 'design_error') {
+        css = 'text-[#da1e28]';
+    } else if (type === 'design_status') {
+        css = 'text-[#f1c21b]';
+    } else if (type === 'design_result') {
+        css = 'text-[#24a148]';
+    }
 
     if (typeof window.logLine === 'function') {
-        let color = 'text-[#a6e22e]';
-
-        if (
-            type === 'stderr' ||
-            type === 'design_error'
-        ) {
-            color = 'text-[#da1e28]';
-        } else if (
-            type === 'design_status'
-        ) {
-            color = 'text-[#f1c21b]';
-        } else if (
-            type === 'design_result'
-        ) {
-            color = 'text-[#24a148]';
-        }
-
         window.logLine(
             escapeHtml(message),
-            color
+            css
         );
-
-        const log =
-            document.querySelector('.console-log-box');
-
-        if (log) {
-            requestAnimationFrame(() => {
-                log.scrollTop = log.scrollHeight;
-            });
-        }
-
-        return;
-    }
-
-    const log =
-        document.querySelector('.console-log-box');
-
-    if (!log) return;
-
-    const line =
-        document.createElement('div');
-
-    line.innerText = message;
-
-    if (
-        type === 'stderr' ||
-        type === 'design_error'
-    ) {
-        line.style.color = '#ff5555';
-    } else if (
-        type === 'design_status'
-    ) {
-        line.style.color = '#f1c21b';
-    } else if (
-        type === 'design_result'
-    ) {
-        line.style.color = '#24a148';
     } else {
-        line.style.color = '#a6e22e';
-    }
+        const log =
+            document.querySelector('.console-log-box') ||
+            document.querySelector('.console-log');
 
-    log.appendChild(line);
+        if (!log) return;
 
-    requestAnimationFrame(() => {
+        const line = document.createElement('div');
+        line.className = css;
+        line.textContent = message;
+        log.appendChild(line);
         log.scrollTop = log.scrollHeight;
-    });
+    }
 }
 
 function connectClriksWebSocket() {
