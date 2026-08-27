@@ -16,29 +16,74 @@ const consoleLogElement =
     document.querySelector('.console-log-box');
 
 function appendConsole(text, type = 'stdout') {
-    if (!consoleLogElement) return;
+    const message = `[${new Date().toLocaleTimeString()}] ${text}`;
 
-    const line = document.createElement('div');
+    if (typeof window.logLine === 'function') {
+        let color = 'text-[#a6e22e]';
 
-    line.innerText =
-        `[${new Date().toLocaleTimeString()}] ${text}`;
+        if (
+            type === 'stderr' ||
+            type === 'design_error'
+        ) {
+            color = 'text-[#da1e28]';
+        } else if (
+            type === 'design_status'
+        ) {
+            color = 'text-[#f1c21b]';
+        } else if (
+            type === 'design_result'
+        ) {
+            color = 'text-[#24a148]';
+        }
 
-    if (type === 'stderr' || type === 'design_error') {
+        window.logLine(
+            escapeHtml(message),
+            color
+        );
+
+        const log =
+            document.querySelector('.console-log-box');
+
+        if (log) {
+            requestAnimationFrame(() => {
+                log.scrollTop = log.scrollHeight;
+            });
+        }
+
+        return;
+    }
+
+    const log =
+        document.querySelector('.console-log-box');
+
+    if (!log) return;
+
+    const line =
+        document.createElement('div');
+
+    line.innerText = message;
+
+    if (
+        type === 'stderr' ||
+        type === 'design_error'
+    ) {
         line.style.color = '#ff5555';
-    } else if (type === 'design_status') {
+    } else if (
+        type === 'design_status'
+    ) {
         line.style.color = '#f1c21b';
-    } else if (type === 'design_result') {
+    } else if (
+        type === 'design_result'
+    ) {
         line.style.color = '#24a148';
     } else {
         line.style.color = '#a6e22e';
     }
 
-    consoleLogElement.appendChild(line);
+    log.appendChild(line);
 
-    // Luôn cuộn tới log mới nhất
     requestAnimationFrame(() => {
-        consoleLogElement.scrollTop =
-            consoleLogElement.scrollHeight;
+        log.scrollTop = log.scrollHeight;
     });
 }
 
