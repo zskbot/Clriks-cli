@@ -152,6 +152,130 @@ main {
         <div class="text-center"><p class="text-[8px] text-[#8d8d8d] uppercase italic">Region</p><p id="region-stat" class="text-xs font-bold">VN-S1</p></div>
     </footer>
 
+
+<style id="clriks-shell-mobile-fix">
+html,
+body {
+  height: 100%;
+  min-height: 100%;
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
+body {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+}
+
+#clriks-shell-root,
+main,
+.shell-container {
+  min-height: 0;
+}
+
+.console-log-box,
+.console-log {
+  overflow-y: auto !important;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: auto !important;
+}
+
+#command-input {
+  position: relative;
+  z-index: 20;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 16px !important;
+  line-height: 1.4;
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-appearance: none;
+}
+
+#command-input:focus {
+  outline: none;
+}
+
+.clriks-shell-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 22px;
+  padding: 3px 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: .04em;
+  border-top: 1px solid #262626;
+  border-bottom: 1px solid #262626;
+  background: #050505;
+}
+
+.clriks-shell-status .state {
+  font-weight: 700;
+}
+
+.clriks-shell-status.ready .state {
+  color: #24a148;
+}
+
+.clriks-shell-status.running .state {
+  color: #f1c21b;
+}
+
+.clriks-shell-status.done .state {
+  color: #24a148;
+}
+
+.clriks-shell-status.error .state {
+  color: #da1e28;
+}
+
+.clriks-shell-spinner {
+  display: inline-block;
+  width: 10px;
+  text-align: center;
+}
+
+.clriks-shell-prompt {
+  color: #24a148;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.clriks-shell-command {
+  color: #f4f4f4;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.clriks-shell-progress {
+  margin: 2px 0;
+  color: #8d8d8d;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+}
+
+@media (max-width: 768px) {
+  #command-input {
+    min-height: 42px;
+  }
+
+  .console-log-box,
+  .console-log {
+    padding-bottom: 12px !important;
+  }
+}
+</style>
+
+
+<div class="clriks-shell-status ready">
+  <span class="state">READY</span>
+  <span class="clriks-shell-spinner"></span>
+</div>
+
 <script src="script.js"></script>
 
 <script>
@@ -215,6 +339,15 @@ function planWithLlm(command){
 }
 
 function executeCommand(raw){
+  const shellCommand = String(raw || '').trim();
+
+  if (
+    shellCommand &&
+    typeof window.clriksShellBegin === 'function'
+  ) {
+    window.clriksShellBegin(shellCommand);
+  }
+
   const command = raw.trim();
   if(!command) return;
   logLine(`<span class="text-white">usr@clriks:~$ ${escapeHtml(command)}</span>`, 'text-white');
