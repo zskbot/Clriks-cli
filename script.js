@@ -269,7 +269,11 @@ if (inputElement) {
     let shellRunning = false;
     let shellSpinnerTimer = null;
     let shellSpinnerIndex = 0;
-    let keyboardOpen = false;
+
+    let imeOpen = false;
+    let savedLogScrollTop = 0;
+    let commandBar = null;
+    let input = null;
 
     const spinnerFrames = [
         '⠋','⠙','⠹','⠸','⠼',
@@ -279,6 +283,31 @@ if (inputElement) {
     function shellConsole() {
         return document.querySelector('.console-log-box') ||
                document.querySelector('.console-log');
+    }
+
+    /*
+     * Find the complete input row instead of moving only
+     * the input element. This keeps the Enter button with it.
+     */
+    function findCommandBar() {
+        if (commandBar) return commandBar;
+
+        input = document.getElementById('command-input');
+
+        if (!input) return null;
+
+        commandBar =
+            input.closest('form') ||
+            input.closest('.flex') ||
+            input.parentElement;
+
+        if (commandBar) {
+            commandBar.classList.add(
+                'clriks-ime-command-bar'
+            );
+        }
+
+        return commandBar;
     }
 
     function shellStatus(state, text) {
@@ -297,14 +326,30 @@ if (inputElement) {
         }
     }
 
-    function shellScrollBottom() {
+    function shellScrollBottom(force) {
         const el = shellConsole();
 
         if (!el) return;
 
+        /*
+         * NEVER move the log because the keyboard opened.
+         */
+        if (imeOpen && !force) {
+            el.scrollTop = savedLogScrollTop;
+            return;
+        }
+
         requestAnimationFrame(() => {
             el.scrollTop = el.scrollHeight;
         });
+    }
+
+    function saveLogPosition() {
+        const el = shellConsole();
+
+        if (el) {
+            savedLogScrollTop = el.scrollTop;
+        }
     }
 
     function shellLine(command) {
@@ -324,9 +369,10 @@ if (inputElement) {
 
         row.appendChild(prompt);
         row.appendChild(cmd);
+
         el.appendChild(row);
 
-        shellScrollBottom();
+        shellScrollBottom(true);
     }
 
     function shellProgress(text) {
@@ -343,12 +389,14 @@ if (inputElement) {
 
         el.appendChild(row);
 
-        shellScrollBottom();
+        shellScrollBottom(true);
     }
 
     function shellSpinnerStart() {
         const el =
-            document.querySelector('.clriks-shell-spinner');
+            document.querySelector(
+                '.clriks-shell-spinner'
+            );
 
         clearInterval(shellSpinnerTimer);
 
@@ -367,11 +415,12 @@ if (inputElement) {
 
     function shellSpinnerStop() {
         clearInterval(shellSpinnerTimer);
-
         shellSpinnerTimer = null;
 
         const el =
-            document.querySelector('.clriks-shell-spinner');
+            document.querySelector(
+                '.clriks-shell-spinner'
+            );
 
         if (el) {
             el.textContent = '';
@@ -437,7 +486,7 @@ if (inputElement) {
             success ? 'DONE' : 'ERROR'
         );
 
-        shellScrollBottom();
+        shellScrollBottom(true);
 
         setTimeout(() => {
             if (!shellRunning) {
@@ -446,55 +495,199 @@ if (inputElement) {
         }, 1500);
     }
 
-    window.clriksShellBegin = shellBegin;
-    window.clriksShellFinish = shellFinish;
+    /*
+     * =======================================================
+     * ANDROID IME CONTROLLER
+     * =======================================================
+     *
+     * The important part:
+     *
+     * Chrome can shrink visualViewport when the keyboard opens.
+     * We DO NOT resize/reflow the shell.
+     *
+     * Only the command bar is translated so that it sits
+     * immediately above the keyboard.
+     */
 
-    const input =
-        document.getElementById('command-input');
+    function updateImePosition() {
+        if (!imeOpen) return;
 
-    if (input) {
-        input.addEventListener('focus', () => {
-            keyboardOpen = true;
+        const vv = window.visualViewport;
 
-            document.documentElement.classList.add(
-                'clriks-keyboard-open'
-            );
-        });
+        if (!vv) return;
 
-        input.addEventListener('blur', () => {
-            keyboardOpen = false;
+        const bar = findCommandBar();
 
-            document.documentElement.classList.remove(
-                'clriks-keyboard-open'
-            );
+        if (!bar) return;
+
+        /*
+         * visualViewport.offsetTop tells us where the visible
+         * viewport currently begins.
+         *
+         * Keyboard top in layout coordinates:
+         *
+         *   offsetTop + height
+         */
+        const keyboardTop =
+            vv.offsetTop + vv.height;
+
+        const layoutHeight =
+            window.innerHeight;
+
+        const shift =
+            layoutHeight - keyboardTop;
+
+        bar.style.transform =
+            'translate3d(0,' +
+            Math.min(0, shift) +
+            'px,0)';
+    }
+
+    function openImeMode() {
+        if (imeOpen) return;
+
+        imeOpen = true;
+
+        saveLogPosition();
+
+        document.documentElement.classList.add(
+            'clriks-ime-open'
+        );
+
+        findCommandBar();
+
+        /*
+         * Let Android finish opening the keyboard first,
+         * then position the command bar.
+         */
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                updateImePosition();
+
+                const el = shellConsole();
+
+                if (el) {
+                    el.scrollTop =
+                        savedLogScrollTop;
+                }
+            });
         });
     }
 
+    function closeImeMode() {
+        imeOpen = false;
+
+        document.documentElement.classList.remove(
+            'clriks-ime-open'
+        );
+
+        if (commandBar) {
+            commandBar.style.transform = '';
+        }
+    }
+
+    function installInputController() {
+        input =
+            document.getElementById(
+                'command-input'
+            );
+
+        if (!input) return;
+
+        findCommandBar();
+
+        input.addEventListener(
+            'focus',
+            openImeMode,
+            { passive: true }
+        );
+
+        input.addEventListener(
+            'blur',
+            closeImeMode,
+            { passive: true }
+        );
+    }
+
+    window.clriksShellBegin =
+        shellBegin;
+
+    window.clriksShellFinish =
+        shellFinish;
+
     /*
-     * Android visualViewport:
-     *
-     * Khi IME mở, không resize/scroll shell.
-     * Chỉ khóa body vào viewport hiện tại.
+     * visualViewport is used ONLY for the command bar.
+     * The shell/log is never resized from this event.
      */
     if (window.visualViewport) {
-        const lockViewport = () => {
-            if (!keyboardOpen) return;
-
-            document.documentElement.classList.add(
-                'clriks-keyboard-open'
-            );
-        };
-
         window.visualViewport.addEventListener(
             'resize',
-            lockViewport,
+            () => {
+                if (!imeOpen) return;
+
+                updateImePosition();
+
+                /*
+                 * Restore the exact log position after Chrome
+                 * finishes its viewport resize.
+                 */
+                const el = shellConsole();
+
+                if (el) {
+                    requestAnimationFrame(() => {
+                        el.scrollTop =
+                            savedLogScrollTop;
+                    });
+                }
+            },
             { passive: true }
         );
 
         window.visualViewport.addEventListener(
             'scroll',
-            lockViewport,
+            () => {
+                if (!imeOpen) return;
+
+                updateImePosition();
+            },
             { passive: true }
         );
+    }
+
+    /*
+     * Prevent Chrome from restoring a different scroll position
+     * after keyboard animation.
+     */
+    window.addEventListener(
+        'scroll',
+        () => {
+            if (!imeOpen) return;
+
+            window.scrollTo(
+                window.scrollX,
+                0
+            );
+
+            const el = shellConsole();
+
+            if (el) {
+                el.scrollTop =
+                    savedLogScrollTop;
+            }
+        },
+        { passive: true }
+    );
+
+    if (
+        document.readyState ===
+        'loading'
+    ) {
+        document.addEventListener(
+            'DOMContentLoaded',
+            installInputController,
+            { once: true }
+        );
+    } else {
+        installInputController();
     }
 })();
