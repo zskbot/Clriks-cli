@@ -153,6 +153,9 @@ main {
     </footer>
 
 <script>
+
+<script src="script.js"></script>
+
 const state = {
   token: localStorage.getItem('clriks.githubToken') || '',
   repo: localStorage.getItem('clriks.repo') || 'owner/repo',
@@ -293,6 +296,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('[data-panel]').forEach(btn => btn.addEventListener('click', () => renderPanel(btn.dataset.panel)));
 });
 </script>
-<script src="script.js"></script>
+
 </body>
 </html>
