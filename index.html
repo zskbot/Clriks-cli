@@ -230,7 +230,7 @@ function executeCommand(raw){
   }
 
     // REAL DESIGN ENGINE
-    // agent design <prompt> -> WebSocket -> Node.js -> Python
+    // agent design <prompt> -> WebSocket client -> Node.js -> Python
     if (/^agent\s+design(?:\s+|$)/i.test(command)) {
       const prompt = command.replace(/^agent\s+design\s*/i, '').trim();
 
@@ -241,26 +241,31 @@ function executeCommand(raw){
         );
       }
 
-      if (
-        !window.clriksSocket ||
-        window.clriksSocket.readyState !== WebSocket.OPEN
-      ) {
-        return logLine(
-          '[Design] WebSocket backend chưa kết nối — đang tự kết nối lại...',
-          'text-[#da1e28]'
-        );
-      }
-
       logLine(
         `[Design] Gửi Python Design Engine: ${escapeHtml(prompt)}`,
         'text-[#24a148]'
       );
 
-      window.clriksSocket.send(command);
-      return;
+      if (typeof window.sendClriksCommand === 'function') {
+        const sent = window.sendClriksCommand(command);
+
+        if (!sent) {
+          logLine(
+            '[Design] Đang chờ WebSocket backend...',
+            'text-[#f1c21b]'
+          );
+        }
+
+        return;
+      }
+
+      return logLine(
+        '[Design] WebSocket client chưa sẵn sàng.',
+        'text-[#da1e28]'
+      );
     }
 
-  const plan = planWithLlm(command);
+    const plan = planWithLlm(command);
   logLine('LLM function_call → <code>' + escapeHtml(JSON.stringify(plan)) + '</code>', 'text-[#be95ff]');
   if(plan.action === 'CREATE_TASK') logLine(`Octokit issues.create({ repo:"${escapeHtml(state.repo)}", title:"${escapeHtml(plan.title)}" })`, 'text-[#24a148]');
   if(plan.action === 'CREATE_PR') logLine(`Workflow: ${plan.steps.join(' → ')} → gh pr create --repo ${escapeHtml(state.repo)}`, 'text-[#0f62fe]');
