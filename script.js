@@ -49,6 +49,7 @@ function appendConsole(text, type = 'stdout') {
 }
 
 function connectClriksWebSocket() {
+    // Chỉ cho phép MỘT WebSocket duy nhất.
     if (
         clriksSocket &&
         (
@@ -56,23 +57,15 @@ function connectClriksWebSocket() {
             clriksSocket.readyState === WebSocket.CONNECTING
         )
     ) {
-        return;
+        return clriksSocket;
     }
 
     try {
         clriksSocket = new WebSocket(CLRICKS_WS_URL);
 
-        window.clriksSocket = clriksSocket;
-
         clriksSocket.onopen = () => {
-            clriksSocketReady = true;
-
-            console.log(
-                'Clriks WebSocket CONNECTED'
-            );
-
             appendConsole(
-                'WebSocket backend đã kết nối.',
+                '[WebSocket] Backend connected',
                 'stdout'
             );
         };
@@ -83,10 +76,7 @@ function connectClriksWebSocket() {
             try {
                 response = JSON.parse(event.data);
             } catch {
-                appendConsole(
-                    event.data,
-                    'stdout'
-                );
+                appendConsole(event.data, 'stdout');
                 return;
             }
 
@@ -136,92 +126,90 @@ function connectClriksWebSocket() {
                 return;
             }
 
-            if (type === 'stderr') {
-                appendConsole(
-                    response.data || '',
-                    'stderr'
-                );
-                return;
-            }
-
             appendConsole(
-                response.data || '',
-                'stdout'
+                response.data ||
+                response.error ||
+                JSON.stringify(response),
+                type === 'stderr' ? 'stderr' : 'stdout'
             );
         };
 
         clriksSocket.onerror = (error) => {
-            clriksSocketReady = false;
-
-            console.error(
-                'Clriks WebSocket ERROR',
-                error
-            );
+            console.error('[Clriks WS] error', error);
         };
 
-        clriksSocket.onclose = () => {
-            clriksSocketReady = false;
-
+        clriksSocket.onclose = (event) => {
             console.log(
-                'Clriks WebSocket CLOSED'
+                '[Clriks WS] closed:',
+                event.code,
+                event.reason || ''
             );
 
-            clearTimeout(
-                clriksReconnectTimer
-            );
+            // Chỉ reconnect nếu đây vẫn là socket hiện tại.
+            if (clriksSocket) {
+                clriksSocket = null;
 
-            clriksReconnectTimer = setTimeout(
-                connectClriksWebSocket,
-                1500
-            );
+                clearTimeout(clriksReconnectTimer);
+
+                clriksReconnectTimer = setTimeout(() => {
+                    connectClriksWebSocket();
+                }, 1500);
+            }
         };
+
+        return clriksSocket;
 
     } catch (error) {
-        clriksSocketReady = false;
-
         console.error(
-            'WebSocket create error:',
+            '[Clriks WS] connection failed:',
             error
         );
 
-        clearTimeout(
-            clriksReconnectTimer
-        );
-
-        clriksReconnectTimer = setTimeout(
-            connectClriksWebSocket,
-            1500
-        );
+        clriksSocket = null;
+        return null;
     }
 }
 
+
 function sendClriksCommand(command) {
-    if (
-        clriksSocket &&
-        clriksSocket.readyState === WebSocket.OPEN
-    ) {
-        clriksSocket.send(command);
+    const socket = connectClriksWebSocket();
+
+    if (!socket) {
+        appendConsole(
+            '[WebSocket] Không tạo được kết nối backend.',
+            'stderr'
+        );
+        return false;
+    }
+
+    if (socket.readyState === WebSocket.OPEN) {
+        socket.send(command);
         return true;
     }
 
     appendConsole(
-        '[WebSocket] Đang kết nối backend, thử lại...',
+        '[WebSocket] Đang kết nối backend, chờ socket OPEN...',
         'stderr'
     );
 
-    connectClriksWebSocket();
-
-    setTimeout(() => {
+    const sendWhenOpen = () => {
         if (
-            clriksSocket &&
-            clriksSocket.readyState === WebSocket.OPEN
+            clriksSocket === socket &&
+            socket.readyState === WebSocket.OPEN
         ) {
-            clriksSocket.send(command);
+            socket.send(command);
         }
-    }, 500);
+    };
+
+    socket.addEventListener(
+        'open',
+        sendWhenOpen,
+        { once: true }
+    );
 
     return false;
 }
+
 
 window.sendClriksCommand =
     sendClriksCommand;
