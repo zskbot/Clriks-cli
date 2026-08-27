@@ -4,10 +4,23 @@ const CLRICKS_BACKEND_URL =
     'https://united-leasing-tmp-neural.trycloudflare.com';
 
 const CLRICKS_WS_URL =
-    CLRICKS_BACKEND_URL.replace(/^http:/, 'ws:')
-                      .replace(/^https:/, 'wss:');
+    CLRICKS_BACKEND_URL.replace(/^https:/, 'wss:')
+                      .replace(/^http:/, 'ws:');
 
 const socket = new WebSocket(CLRICKS_WS_URL);
+
+socket.onopen = () => {
+    console.log('[Clriks] WebSocket connected:', CLRICKS_WS_URL);
+};
+
+socket.onerror = (error) => {
+    console.error('[Clriks] WebSocket error:', error);
+};
+
+socket.onclose = () => {
+    console.warn('[Clriks] WebSocket closed');
+};
+
 const inputElement = document.querySelector('input'); // Ô nhập lệnh màu xanh trong ảnh
 const consoleLogElement = document.querySelector('.console-log-box'); // Vùng hiển thị log chữ xanh
 
