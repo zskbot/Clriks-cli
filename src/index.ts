@@ -1,35 +1,40 @@
 import express from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
-import { exec } from 'child_process';
+import {
+    spawn,
+    ChildProcessWithoutNullStreams
+} from 'child_process';
 import dotenv from 'dotenv';
 import path from 'path';
 
 dotenv.config();
 
 const app = express();
-const PORT = Number(process.env.PORT || 3000);
+
+const PORT =
+    Number(process.env.PORT || 3000);
 
 const PYTHON_DESIGN_ENGINE =
     process.env.CLRICKS_PYTHON_DESIGN_URL ||
     'http://127.0.0.1:8789';
 
-const DESIGN_DIR = path.resolve(
-    process.cwd(),
-    'data/designs'
-);
+const DESIGN_DIR =
+    path.resolve(
+        process.cwd(),
+        'data/designs'
+    );
 
 app.use(express.json());
 
-/*
- * ==========================================
- * CLRICKS PYTHON DESIGN ENGINE
- * ==========================================
- */
+/* =========================================================
+   DESIGN ENGINE
+   ========================================================= */
 
 async function generateDesign(
     prompt: string,
     format: string = 'svg'
 ): Promise<any> {
+
     const response = await fetch(
         `${PYTHON_DESIGN_ENGINE}/design/generate`,
         {
@@ -56,278 +61,434 @@ async function generateDesign(
     return data;
 }
 
-/*
- * Python Engine health
- */
+app.get(
+    '/design/health',
+    async (_req, res) => {
+        try {
+            const response = await fetch(
+                `${PYTHON_DESIGN_ENGINE}/health`
+            );
 
-app.get('/design/health', async (_req, res) => {
-    try {
-        const response = await fetch(
-            `${PYTHON_DESIGN_ENGINE}/health`
-        );
+            const data =
+                await response.json();
 
-        const data = await response.json();
-
-        res.json({
-            ok: true,
-            node: 'online',
-            python: data
-        });
-    } catch (error: any) {
-        res.status(503).json({
-            ok: false,
-            node: 'online',
-            python: 'offline',
-            error: error?.message || String(error)
-        });
-    }
-});
-
-/*
- * Generate design through Python
- */
-
-app.post('/design/generate', async (req, res) => {
-    try {
-        const prompt = String(
-            req.body?.prompt || ''
-        ).trim();
-
-        const format = String(
-            req.body?.format || 'svg'
-        ).toLowerCase();
-
-        if (!prompt) {
-            res.status(400).json({
-                ok: false,
-                error: 'prompt is required'
+            res.json({
+                ok: true,
+                node: 'online',
+                python: data
             });
-            return;
-        }
 
-        if (!['svg', 'html'].includes(format)) {
-            res.status(400).json({
+        } catch (error: any) {
+
+            res.status(503).json({
                 ok: false,
-                error: 'format must be svg or html'
+                node: 'online',
+                python: 'offline',
+                error:
+                    error?.message ||
+                    String(error)
             });
-            return;
         }
-
-        const result = await generateDesign(
-            prompt,
-            format
-        );
-
-        res.json({
-            ok: true,
-            source: 'nodejs',
-            engine: 'python',
-            data: result
-        });
-
-    } catch (error: any) {
-        res.status(502).json({
-            ok: false,
-            error:
-                error?.message ||
-                String(error)
-        });
     }
-});
+);
 
-/*
- * Serve generated designs
- */
+app.post(
+    '/design/generate',
+    async (req, res) => {
+
+        try {
+
+            const prompt =
+                String(
+                    req.body?.prompt || ''
+                ).trim();
+
+            const format =
+                String(
+                    req.body?.format || 'svg'
+                ).toLowerCase();
+
+            if (!prompt) {
+                res.status(400).json({
+                    ok: false,
+                    error:
+                        'prompt is required'
+                });
+                return;
+            }
+
+            if (
+                !['svg', 'html']
+                    .includes(format)
+            ) {
+                res.status(400).json({
+                    ok: false,
+                    error:
+                        'format must be svg or html'
+                });
+                return;
+            }
+
+            const result =
+                await generateDesign(
+                    prompt,
+                    format
+                );
+
+            res.json({
+                ok: true,
+                source: 'nodejs',
+                engine: 'python',
+                data: result
+            });
+
+        } catch (error: any) {
+
+            res.status(502).json({
+                ok: false,
+                error:
+                    error?.message ||
+                    String(error)
+            });
+        }
+    }
+);
 
 app.use(
     '/designs',
     express.static(DESIGN_DIR)
 );
 
-/*
- * ==========================================
- * HTTP SERVER
- * ==========================================
- */
+/* =========================================================
+   HTTP
+   ========================================================= */
 
-const server = app.listen(
-    PORT,
-    () => {
-        console.log(
-            `[Hệ thống] Backend đang chạy tại http://localhost:${PORT}`
-        );
+const server =
+    app.listen(
+        PORT,
+        () => {
 
-        console.log(
-            `[Design] Python Engine: ${PYTHON_DESIGN_ENGINE}`
+            console.log(
+                `[Clriks] Backend listening on ${PORT}`
+            );
+
+            console.log(
+                `[Design] Python Engine: ${PYTHON_DESIGN_ENGINE}`
+            );
+
+            console.log(
+                '[Shell] Persistent interactive Bash PTY enabled'
+            );
+        }
+    );
+
+/* =========================================================
+   PERSISTENT BASH SESSION
+   ========================================================= */
+
+interface ShellSession {
+    process:
+        ChildProcessWithoutNullStreams;
+
+    cwd: string;
+}
+
+function send(
+    ws: WebSocket,
+    type: string,
+    data: unknown
+) {
+    if (
+        ws.readyState ===
+        WebSocket.OPEN
+    ) {
+        ws.send(
+            JSON.stringify({
+                type,
+                data
+            })
         );
     }
-);
+}
 
-/*
- * ==========================================
- * WEBSOCKET SERVER
- * ==========================================
- */
+function createShell(
+    ws: WebSocket
+): ShellSession {
 
-const wss = new WebSocketServer({
-    server
-});
+    /*
+     * `script` allocates a real pseudo-terminal.
+     *
+     * Bash remains alive for the lifetime of
+     * the WebSocket connection.
+     */
+    const shell =
+        spawn(
+            'script',
+            [
+                '-q',
+                '/dev/null',
+                '-c',
+                'bash --noprofile --norc -i'
+            ],
+            {
+                cwd: process.cwd(),
+
+                env: {
+                    ...process.env,
+
+                    TERM:
+                        'xterm-256color',
+
+                    COLORTERM:
+                        'truecolor',
+
+                    LANG:
+                        process.env.LANG ||
+                        'en_US.UTF-8',
+
+                    LC_ALL:
+                        process.env.LC_ALL ||
+                        process.env.LANG ||
+                        'en_US.UTF-8',
+
+                    FORCE_COLOR:
+                        '1'
+                },
+
+                stdio: [
+                    'pipe',
+                    'pipe',
+                    'pipe'
+                ]
+            }
+        );
+
+    const session: ShellSession = {
+        process: shell,
+        cwd: process.cwd()
+    };
+
+    shell.stdout.on(
+        'data',
+        (data: Buffer) => {
+
+            send(
+                ws,
+                'stdout',
+                data.toString()
+            );
+        }
+    );
+
+    shell.stderr.on(
+        'data',
+        (data: Buffer) => {
+
+            send(
+                ws,
+                'stderr',
+                data.toString()
+            );
+        }
+    );
+
+    shell.on(
+        'error',
+        (error) => {
+
+            send(
+                ws,
+                'stderr',
+                error.message
+            );
+        }
+    );
+
+    shell.on(
+        'exit',
+        (code, signal) => {
+
+            send(
+                ws,
+                'shell_exit',
+                {
+                    code,
+                    signal
+                }
+            );
+        }
+    );
+
+    /*
+     * Keep Bash output clean and make the
+     * working directory obvious.
+     */
+    setTimeout(() => {
+
+        if (!shell.stdin.writable) {
+            return;
+        }
+
+        shell.stdin.write(
+            'export PS1="usr@clriks:\\w$ "\n'
+        );
+
+        shell.stdin.write(
+            'export PS2="> "\n'
+        );
+
+        shell.stdin.write(
+            'export TERM="xterm-256color"\n'
+        );
+
+    }, 50);
+
+    return session;
+}
+
+/* =========================================================
+   WEBSOCKET
+   ========================================================= */
+
+const wss =
+    new WebSocketServer({
+        server
+    });
 
 wss.on(
     'connection',
     (ws: WebSocket) => {
 
         console.log(
-            '[Kết nối] Giao diện Web Agent Console đã kết nối thành công!'
+            '[Shell] Persistent terminal connected'
         );
 
-        ws.send(
-            JSON.stringify({
-                type: 'system',
-                data: 'Clriks Agent Console connected'
-            })
+        const session =
+            createShell(ws);
+
+        const shell =
+            session.process;
+
+        send(
+            ws,
+            'system',
+            'Clriks persistent Bash session connected'
         );
 
         ws.on(
             'message',
             async (message) => {
 
-                const command =
-                    message
-                        .toString()
-                        .trim();
+                if (
+                    shell.exitCode !== null ||
+                    !shell.stdin.writable
+                ) {
+                    return;
+                }
 
-                console.log(
-                    `[Lệnh nhận được]: ${command}`
-                );
+                const raw =
+                    message.toString();
 
                 /*
-                 * ==================================
-                 * AGENT DESIGN
-                 * ==================================
+                 * JSON protocol:
+                 *
+                 * input:
+                 *   arbitrary stdin
+                 *
+                 * signal:
+                 *   SIGINT / SIGTSTP / etc.
                  */
+                let parsed:
+                    any = null;
 
-                const designPrefix =
-                    'agent design';
+                try {
+                    parsed =
+                        JSON.parse(raw);
+                } catch {
+                    parsed = null;
+                }
 
                 if (
-                    command
-                        .toLowerCase()
-                        .startsWith(designPrefix)
+                    parsed &&
+                    typeof parsed === 'object'
                 ) {
 
-                    const prompt =
-                        command
-                            .slice(
-                                designPrefix.length
-                            )
-                            .trim();
+                    if (
+                        parsed.type === 'input'
+                    ) {
 
-                    if (!prompt) {
-                        ws.send(
-                            JSON.stringify({
-                                type: 'design_error',
-                                error:
-                                    'Thiếu mô tả thiết kế.'
-                            })
-                        );
+                        const data =
+                            String(
+                                parsed.data ?? ''
+                            );
+
+                        if (data) {
+                            shell.stdin.write(
+                                data
+                            );
+                        }
 
                         return;
                     }
 
-                    try {
+                    if (
+                        parsed.type === 'signal'
+                    ) {
 
-                        ws.send(
-                            JSON.stringify({
-                                type: 'design_status',
-                                status: 'generating',
-                                prompt
-                            })
-                        );
+                        const signal =
+                            String(
+                                parsed.signal ||
+                                'SIGINT'
+                            ) as NodeJS.Signals;
 
-                        const result =
-                            await generateDesign(
-                                prompt,
-                                'svg'
-                            );
+                        try {
+                            shell.kill(signal);
+                        } catch {}
 
-                        ws.send(
-                            JSON.stringify({
-                                type: 'design_result',
-                                data: result
-                            })
-                        );
-
-                    } catch (error: any) {
-
-                        ws.send(
-                            JSON.stringify({
-                                type: 'design_error',
-                                error:
-                                    error?.message ||
-                                    String(error)
-                            })
-                        );
+                        return;
                     }
 
                     return;
                 }
 
                 /*
-                 * ==================================
-                 * SECURITY GUARDRAIL
-                 * ==================================
+                 * Backward compatibility:
+                 * plain WebSocket text = stdin.
                  */
+                shell.stdin.write(raw);
+            }
+        );
 
-                if (
-                    command.includes('rm ') ||
-                    command.includes('del ')
-                ) {
+        ws.on(
+            'close',
+            () => {
 
-                    ws.send(
-                        JSON.stringify({
-                            type: 'stderr',
-                            data:
-                                'Lỗi: Không được phép dùng lệnh xóa hệ thống!'
-                        })
-                    );
-
-                    return;
-                }
-
-                /*
-                 * ==================================
-                 * NORMAL TERMINAL COMMAND
-                 * ==================================
-                 */
-
-                exec(
-                    command,
-                    (error, stdout, stderr) => {
-
-                        if (error) {
-
-                            ws.send(
-                                JSON.stringify({
-                                    type: 'stderr',
-                                    data:
-                                        stderr ||
-                                        error.message
-                                })
-                            );
-
-                            return;
-                        }
-
-                        ws.send(
-                            JSON.stringify({
-                                type: 'stdout',
-                                data: stdout
-                            })
-                        );
-                    }
+                console.log(
+                    '[Shell] Terminal disconnected'
                 );
+
+                try {
+                    shell.kill(
+                        'SIGTERM'
+                    );
+                } catch {}
+            }
+        );
+
+        ws.on(
+            'error',
+            () => {
+
+                try {
+                    shell.kill(
+                        'SIGTERM'
+                    );
+                } catch {}
             }
         );
     }
+);
+
+console.log(
+    '[Clriks] Persistent Bash PTY initialized'
 );
