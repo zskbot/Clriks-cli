@@ -151,6 +151,34 @@ function executeCommand(raw){
     return logLine(`[OK] Memory budget: ${escapeHtml(state.memory)}`, 'text-[#24a148]');
   }
 
+    // REAL DESIGN ENGINE
+    // agent design <prompt> -> WebSocket -> Node.js -> Python
+    if (/^agent\\s+design(?:\\s+|$)/i.test(command)) {
+      const prompt = command.replace(/^agent\\s+design\\s*/i, '').trim();
+
+      if (!prompt) {
+        return logLine(
+          '[Design] Nhập prompt: agent design <mô tả thiết kế>',
+          'text-[#da1e28]'
+        );
+      }
+
+      if (typeof socket === 'undefined' || socket.readyState !== WebSocket.OPEN) {
+        return logLine(
+          '[Design] WebSocket backend chưa kết nối.',
+          'text-[#da1e28]'
+        );
+      }
+
+      logLine(
+        `[Design] Gửi Python Design Engine: ${escapeHtml(prompt)}`,
+        'text-[#24a148]'
+      );
+
+      socket.send(command);
+      return;
+    }
+
   const plan = planWithLlm(command);
   logLine('LLM function_call → <code>' + escapeHtml(JSON.stringify(plan)) + '</code>', 'text-[#be95ff]');
   if(plan.action === 'CREATE_TASK') logLine(`Octokit issues.create({ repo:"${escapeHtml(state.repo)}", title:"${escapeHtml(plan.title)}" })`, 'text-[#24a148]');
