@@ -270,7 +270,10 @@ if (inputElement) {
     let shellSpinnerTimer = null;
     let shellSpinnerIndex = 0;
 
-    const spinnerFrames = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+    const spinnerFrames = [
+        '⠋','⠙','⠹','⠸','⠼',
+        '⠴','⠦','⠧','⠇','⠏'
+    ];
 
     function shellConsole() {
         return document.querySelector('.console-log-box') ||
@@ -280,38 +283,48 @@ if (inputElement) {
     function shellBottom() {
         const el = shellConsole();
         if (!el) return;
+
         requestAnimationFrame(() => {
             el.scrollTop = el.scrollHeight;
         });
     }
 
     function shellStatus(state, text) {
-        const el = document.querySelector('.clriks-shell-status');
+        const el =
+            document.querySelector('.clriks-shell-status');
+
         if (!el) return;
 
-        el.className = 'clriks-shell-status ' + state;
+        el.className =
+            'clriks-shell-status ' + state;
 
-        const label = el.querySelector('.state');
-        if (label) label.textContent = text;
+        const label =
+            el.querySelector('.state');
+
+        if (label) {
+            label.textContent = text;
+        }
     }
 
     function shellSpinnerStart() {
-        const el = document.querySelector('.clriks-shell-status');
+        const el =
+            document.querySelector('.clriks-shell-status');
+
         if (!el) return;
 
-        const spinner = el.querySelector('.clriks-shell-spinner');
-        const label = el.querySelector('.state');
-
-        if (label) label.textContent = 'RUNNING';
+        const spinner =
+            el.querySelector('.clriks-shell-spinner');
 
         clearInterval(shellSpinnerTimer);
+
         shellSpinnerIndex = 0;
 
         shellSpinnerTimer = setInterval(() => {
             if (spinner) {
                 spinner.textContent =
                     spinnerFrames[
-                        shellSpinnerIndex++ % spinnerFrames.length
+                        shellSpinnerIndex++ %
+                        spinnerFrames.length
                     ];
             }
         }, 90);
@@ -322,27 +335,42 @@ if (inputElement) {
         shellSpinnerTimer = null;
 
         const spinner =
-            document.querySelector('.clriks-shell-spinner');
+            document.querySelector(
+                '.clriks-shell-spinner'
+            );
 
-        if (spinner) spinner.textContent = '';
+        if (spinner) {
+            spinner.textContent = '';
+        }
     }
 
     function shellLine(command) {
         const el = shellConsole();
         if (!el) return;
 
-        const row = document.createElement('div');
+        const row =
+            document.createElement('div');
 
-        const prompt = document.createElement('span');
-        prompt.className = 'clriks-shell-prompt';
-        prompt.textContent = 'usr@clriks:~$ ';
+        const prompt =
+            document.createElement('span');
 
-        const cmd = document.createElement('span');
-        cmd.className = 'clriks-shell-command';
+        prompt.className =
+            'clriks-shell-prompt';
+
+        prompt.textContent =
+            'usr@clriks:~$ ';
+
+        const cmd =
+            document.createElement('span');
+
+        cmd.className =
+            'clriks-shell-command';
+
         cmd.textContent = command;
 
         row.appendChild(prompt);
         row.appendChild(cmd);
+
         el.appendChild(row);
 
         shellBottom();
@@ -352,45 +380,69 @@ if (inputElement) {
         const el = shellConsole();
         if (!el) return;
 
-        const row = document.createElement('div');
-        row.className = 'clriks-shell-progress';
+        const row =
+            document.createElement('div');
+
+        row.className =
+            'clriks-shell-progress';
+
         row.textContent = text;
 
         el.appendChild(row);
+
         shellBottom();
     }
 
     function shellBegin(command) {
-        if (shellRunning) return;
+        if (!command || shellRunning) {
+            return;
+        }
 
         shellRunning = true;
 
-        shellStatus('running', 'RUNNING');
+        shellStatus(
+            'running',
+            'RUNNING'
+        );
+
         shellSpinnerStart();
 
         shellLine(command);
 
         if (/^agent\s+design\b/i.test(command)) {
-            shellProgress('⠋ Connecting to Python Design Engine...');
+            shellProgress(
+                '⠋ Connecting to Python Design Engine...'
+            );
 
             setTimeout(() => {
-                if (shellRunning) {
-                    shellProgress('⠙ Python Design Engine processing...');
-                }
-            }, 300);
+                if (!shellRunning) return;
+
+                shellProgress(
+                    '⠙ Python Design Engine processing...'
+                );
+            }, 350);
 
             setTimeout(() => {
-                if (shellRunning) {
-                    shellProgress('⠹ Generating design...');
-                }
-            }, 700);
+                if (!shellRunning) return;
+
+                shellProgress(
+                    '⠹ Generating design...'
+                );
+            }, 800);
         } else {
-            shellProgress('⠋ Executing command...');
+            shellProgress(
+                '⠋ Executing command...'
+            );
         }
     }
 
     function shellFinish(success) {
+        if (!shellRunning) {
+            return;
+        }
+
         shellRunning = false;
+
         shellSpinnerStop();
 
         shellProgress(
@@ -404,33 +456,56 @@ if (inputElement) {
             success ? 'DONE' : 'ERROR'
         );
 
+        shellBottom();
+
         setTimeout(() => {
             if (!shellRunning) {
-                shellStatus('ready', 'READY');
+                shellStatus(
+                    'ready',
+                    'READY'
+                );
             }
-        }, 1200);
+        }, 1500);
     }
 
-    window.clriksShellBegin = shellBegin;
-    window.clriksShellFinish = shellFinish;
+    window.clriksShellBegin =
+        shellBegin;
+
+    window.clriksShellFinish =
+        shellFinish;
 
     /*
-     * Android keyboard:
-     * Không thay đổi chiều cao console khi IME mở.
+     * Android IME FIX
+     *
+     * Không scroll log khi input được focus.
+     * Không gọi scrollIntoView().
      */
-    const input = document.getElementById('command-input');
+    const input =
+        document.getElementById(
+            'command-input'
+        );
 
     if (input) {
-        input.addEventListener('focus', () => {
-            document.documentElement.classList.add(
-                'clriks-keyboard-open'
-            );
-        });
+        input.addEventListener(
+            'focus',
+            () => {
+                document.documentElement
+                    .classList.add(
+                        'clriks-keyboard-open'
+                    );
+            },
+            { passive: true }
+        );
 
-        input.addEventListener('blur', () => {
-            document.documentElement.classList.remove(
-                'clriks-keyboard-open'
-            );
-        });
+        input.addEventListener(
+            'blur',
+            () => {
+                document.documentElement
+                    .classList.remove(
+                        'clriks-keyboard-open'
+                    );
+            },
+            { passive: true }
+        );
     }
 })();
