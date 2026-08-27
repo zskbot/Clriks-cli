@@ -153,8 +153,8 @@ function executeCommand(raw){
 
     // REAL DESIGN ENGINE
     // agent design <prompt> -> WebSocket -> Node.js -> Python
-    if (/^agent\\s+design(?:\\s+|$)/i.test(command)) {
-      const prompt = command.replace(/^agent\\s+design\\s*/i, '').trim();
+    if (/^agent\s+design(?:\s+|$)/i.test(command)) {
+      const prompt = command.replace(/^agent\s+design\s*/i, '').trim();
 
       if (!prompt) {
         return logLine(
