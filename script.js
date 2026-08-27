@@ -1,14 +1,46 @@
-// Kết nối tới Backend Node.js đang chạy ở máy tính cá nhân của bạn
 const CLRICKS_BACKEND_URL =
     window.CLRICKS_BACKEND_URL ||
     'https://united-leasing-tmp-neural.trycloudflare.com';
 
 const CLRICKS_WS_URL =
-    CLRICKS_BACKEND_URL.replace(/^https:/, 'wss:')
-                      .replace(/^http:/, 'ws:');
+    CLRICKS_BACKEND_URL
+        .replace(/^http:/, 'ws:')
+        .replace(/^https:/, 'wss:');
 
 let clriksSocket = null;
+let clriksSocketReady = false;
 let clriksReconnectTimer = null;
+
+const inputElement = document.querySelector('input');
+const consoleLogElement =
+    document.querySelector('.console-log-box');
+
+function appendConsole(text, type = 'stdout') {
+    if (!consoleLogElement) return;
+
+    const line = document.createElement('div');
+
+    line.innerText =
+        `[${new Date().toLocaleTimeString()}] ${text}`;
+
+    if (type === 'stderr' || type === 'design_error') {
+        line.style.color = '#ff5555';
+    } else if (type === 'design_status') {
+        line.style.color = '#f1c21b';
+    } else if (type === 'design_result') {
+        line.style.color = '#24a148';
+    } else {
+        line.style.color = '#a6e22e';
+    }
+
+    consoleLogElement.appendChild(line);
+
+    // Luôn cuộn tới log mới nhất
+    requestAnimationFrame(() => {
+        consoleLogElement.scrollTop =
+            consoleLogElement.scrollHeight;
+    });
+}
 
 function connectClriksWebSocket() {
     if (
@@ -21,29 +53,22 @@ function connectClriksWebSocket() {
         return;
     }
 
-    const wsUrl =
-        window.CLRICKS_WS_URL ||
-        CLRICKS_WS_URL;
-
-    console.log("[Clriks] Connecting WebSocket:", wsUrl);
-
     try {
-        clriksSocket = new WebSocket(wsUrl);
+        clriksSocket = new WebSocket(CLRICKS_WS_URL);
+
         window.clriksSocket = clriksSocket;
-        window.clriksSocketReady = false;
 
         clriksSocket.onopen = () => {
-            window.clriksSocketReady = true;
-            console.log("[Clriks] WebSocket CONNECTED");
+            clriksSocketReady = true;
 
-            if (typeof consoleLogElement !== "undefined" && consoleLogElement) {
-                const el = document.createElement("div");
-                el.innerText =
-                    `[${new Date().toLocaleTimeString()}] [OK] WebSocket backend connected`;
-                el.style.color = "#24a148";
-                consoleLogElement.appendChild(el);
-                consoleLogElement.scrollTop = consoleLogElement.scrollHeight;
-            }
+            console.log(
+                'Clriks WebSocket CONNECTED'
+            );
+
+            appendConsole(
+                'WebSocket backend đã kết nối.',
+                'stdout'
+            );
         };
 
         clriksSocket.onmessage = (event) => {
@@ -52,117 +77,185 @@ function connectClriksWebSocket() {
             try {
                 response = JSON.parse(event.data);
             } catch {
-                response = {
-                    type: "stdout",
-                    data: event.data
-                };
+                appendConsole(
+                    event.data,
+                    'stdout'
+                );
+                return;
             }
 
-            if (typeof consoleLogElement !== "undefined" && consoleLogElement) {
-                const newLog = document.createElement("div");
-                newLog.innerText =
-                    `[${new Date().toLocaleTimeString()}] ${response.data ?? ""}`;
+            const type = response.type;
 
-                newLog.style.color =
-                    response.type === "stderr"
-                        ? "#ff5555"
-                        : "#a6e22e";
-
-                consoleLogElement.appendChild(newLog);
-
-                // Luôn tự động theo log mới nhất
-                requestAnimationFrame(() => {
-                    consoleLogElement.scrollTop =
-                        consoleLogElement.scrollHeight;
-                });
+            if (type === 'system') {
+                appendConsole(
+                    response.data || '',
+                    'stdout'
+                );
+                return;
             }
+
+            if (type === 'design_status') {
+                appendConsole(
+                    '[Design] Python Design Engine đang tạo thiết kế...',
+                    'design_status'
+                );
+                return;
+            }
+
+            if (type === 'design_result') {
+                const data = response.data || {};
+
+                appendConsole(
+                    '[Design] Tạo thiết kế thành công: ' +
+                    (
+                        data.url ||
+                        data.file ||
+                        'design generated'
+                    ),
+                    'design_result'
+                );
+
+                return;
+            }
+
+            if (type === 'design_error') {
+                appendConsole(
+                    '[Design] Lỗi: ' +
+                    (
+                        response.error ||
+                        'Unknown design error'
+                    ),
+                    'design_error'
+                );
+                return;
+            }
+
+            if (type === 'stderr') {
+                appendConsole(
+                    response.data || '',
+                    'stderr'
+                );
+                return;
+            }
+
+            appendConsole(
+                response.data || '',
+                'stdout'
+            );
         };
 
-        clriksSocket.onerror = (err) => {
-            window.clriksSocketReady = false;
-            console.error("[Clriks] WebSocket ERROR", err);
+        clriksSocket.onerror = (error) => {
+            clriksSocketReady = false;
+
+            console.error(
+                'Clriks WebSocket ERROR',
+                error
+            );
         };
 
         clriksSocket.onclose = () => {
-            window.clriksSocketReady = false;
-            console.warn("[Clriks] WebSocket CLOSED");
+            clriksSocketReady = false;
 
-            clearTimeout(clriksReconnectTimer);
+            console.log(
+                'Clriks WebSocket CLOSED'
+            );
 
-            clriksReconnectTimer = setTimeout(() => {
-                connectClriksWebSocket();
-            }, 1500);
+            clearTimeout(
+                clriksReconnectTimer
+            );
+
+            clriksReconnectTimer = setTimeout(
+                connectClriksWebSocket,
+                1500
+            );
         };
 
-    } catch (err) {
-        window.clriksSocketReady = false;
-        console.error("[Clriks] WebSocket INIT ERROR:", err);
+    } catch (error) {
+        clriksSocketReady = false;
 
-        clearTimeout(clriksReconnectTimer);
+        console.error(
+            'WebSocket create error:',
+            error
+        );
 
-        clriksReconnectTimer = setTimeout(() => {
-            connectClriksWebSocket();
-        }, 1500);
+        clearTimeout(
+            clriksReconnectTimer
+        );
+
+        clriksReconnectTimer = setTimeout(
+            connectClriksWebSocket,
+            1500
+        );
     }
 }
 
-window.clriksSocket = null;
-window.clriksSocketReady = false;
+function sendClriksCommand(command) {
+    if (
+        clriksSocket &&
+        clriksSocket.readyState === WebSocket.OPEN
+    ) {
+        clriksSocket.send(command);
+        return true;
+    }
 
+    appendConsole(
+        '[WebSocket] Đang kết nối backend, thử lại...',
+        'stderr'
+    );
+
+    connectClriksWebSocket();
+
+    setTimeout(() => {
+        if (
+            clriksSocket &&
+            clriksSocket.readyState === WebSocket.OPEN
+        ) {
+            clriksSocket.send(command);
+        }
+    }, 500);
+
+    return false;
+}
+
+window.sendClriksCommand =
+    sendClriksCommand;
+
+window.connectClriksWebSocket =
+    connectClriksWebSocket;
+
+// Kết nối ngay khi script được tải
 connectClriksWebSocket();
 
-const inputElement = document.querySelector('input'); // Ô nhập lệnh màu xanh trong ảnh
-const consoleLogElement = document.querySelector('.console-log-box'); // Vùng hiển thị log chữ xanh
+if (inputElement) {
+    inputElement.addEventListener(
+        'keypress',
+        (e) => {
+            if (
+                e.key === 'Enter' &&
+                inputElement.value.trim() !== ''
+            ) {
+                const cmd =
+                    inputElement.value.trim();
 
-socket.onopen = () => {
-    console.log("Đã thông tuyến tới Backend thành công!");
-};
+                if (consoleLogElement) {
+                    const userLog =
+                        document.createElement('div');
 
-socket.onmessage = (event) => {
-    const response = JSON.parse(event.data);
-    
-    // Tạo dòng text mới hiển thị kết quả terminal trả về từ máy tính
-    const newLog = document.createElement('div');
-    newLog.innerText = `[${new Date().toLocaleTimeString()}] ${response.data}`;
-    
-    if (response.type === 'stderr') {
-        newLog.style.color = '#ff5555'; // Hiện màu đỏ nếu lệnh lỗi
-    } else {
-        newLog.style.color = '#a6e22e'; // Hiện màu xanh lá nếu lệnh chạy tốt
-    }
-    
-    consoleLogElement.appendChild(newLog);
-};
+                    userLog.innerText =
+                        `[${new Date().toLocaleTimeString()}] usr@clriks:~$ ${cmd}`;
 
-// Lắng nghe sự kiện gõ phím Enter trên ô nhập lệnh
-inputElement.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter' && inputElement.value.trim() !== '') {
-        const cmd = inputElement.value;
-        
-        // Hiển thị lệnh vừa gõ lên màn hình console
-        const userLog = document.createElement('div');
-        userLog.innerText = `[${new Date().toLocaleTimeString()}] usr@clriks:~$ ${cmd}`;
-        consoleLogElement.appendChild(userLog);
-        
-        // Gửi lệnh qua WebSocket về máy tính để thực thi bằng child_process
-        if (
-            window.clriksSocket &&
-            window.clriksSocket.readyState === WebSocket.OPEN
-        ) {
-            window.clriksSocket.send(cmd);
-        } else {
-            const el = document.createElement('div');
-            el.innerText =
-                `[${new Date().toLocaleTimeString()}] [ERROR] WebSocket backend chưa kết nối`;
-            el.style.color = '#ff5555';
-            consoleLogElement.appendChild(el);
+                    consoleLogElement.appendChild(
+                        userLog
+                    );
+
+                    consoleLogElement.scrollTop =
+                        consoleLogElement.scrollHeight;
+                }
+
+                sendClriksCommand(cmd);
+
+                inputElement.value = '';
+            }
         }
-
-        requestAnimationFrame(() => {
-            consoleLogElement.scrollTop =
-                consoleLogElement.scrollHeight;
-        });
-        
-        inputElement.value = ''; // Xóa trống ô nhập để gõ lệnh tiếp theo
-    }
-});
+    );
+}
