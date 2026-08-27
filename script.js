@@ -7,7 +7,8 @@ const CLRICKS_WS_URL =
     CLRICKS_BACKEND_URL.replace(/^https:/, 'wss:')
                       .replace(/^http:/, 'ws:');
 
-const socket = new WebSocket(CLRICKS_WS_URL);
+window.clriksSocket = new WebSocket(CLRICKS_WS_URL);
+const socket = window.clriksSocket;
 
 socket.onopen = () => {
     console.log('[Clriks] WebSocket connected:', CLRICKS_WS_URL);

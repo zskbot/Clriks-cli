@@ -18,6 +18,84 @@
         .status-dot { width: .5rem; height: .5rem; border-radius: 999px; display: inline-block; margin-right: .35rem; }
         @keyframes blink { 50% { opacity: 0; } }
     </style>
+
+<style id="clriks-mobile-fix">
+/* CLRICKS MOBILE APP FIX */
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
+body {
+  min-height: 100dvh;
+  max-height: 100dvh;
+}
+
+#app,
+.app,
+main {
+  min-height: 100dvh;
+  max-height: 100dvh;
+}
+
+.console-log-box {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: auto;
+  scrollbar-width: none;
+}
+
+.console-log-box::-webkit-scrollbar {
+  display: none;
+}
+
+#command-input {
+  position: relative;
+  z-index: 20;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  font-size: 16px;
+}
+
+@media (max-width: 768px) {
+  html,
+  body {
+    width: 100vw;
+    height: 100dvh;
+    overflow: hidden !important;
+  }
+
+  body {
+    font-size: 14px;
+  }
+
+  #app,
+  .app,
+  main {
+    width: 100vw;
+    height: 100dvh;
+    min-height: 0;
+    max-height: none;
+    overflow: hidden !important;
+  }
+
+  .console-log-box {
+    min-height: 0;
+    max-height: none;
+    flex: 1 1 auto;
+    padding-bottom: 12px;
+  }
+}
+</style>
+
 </head>
 <body class="p-4 max-w-md mx-auto min-h-screen">
 
@@ -207,5 +285,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('[data-panel]').forEach(btn => btn.addEventListener('click', () => renderPanel(btn.dataset.panel)));
 });
 </script>
+<script src="script.js"></script>
 </body>
 </html>
