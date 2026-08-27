@@ -97,109 +97,122 @@ main {
 </style>
 
 
-<style id="clriks-mobile-shell-fix">
+
+<style id="clriks-mobile-shell-v2">
 html,
 body {
-  height: 100%;
-  min-height: 100%;
-  overflow: hidden !important;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
 }
 
 body {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  overscroll-behavior: none;
+    position: fixed !important;
+    inset: 0 !important;
+    touch-action: manipulation;
 }
 
 .clriks-shell-status {
-  flex: 0 0 auto;
-  height: 26px;
-  min-height: 26px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 10px;
-  margin: 4px 0;
-  border-top: 1px solid #393939;
-  border-bottom: 1px solid #393939;
-  background: #080808;
-  font-family: monospace;
-  font-size: 10px;
-  letter-spacing: .08em;
+    flex: 0 0 26px;
+    height: 26px;
+    min-height: 26px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 10px;
+    margin: 4px 0;
+    border-top: 1px solid #393939;
+    border-bottom: 1px solid #393939;
+    background: #080808;
+    font-family: monospace;
+    font-size: 10px;
+    letter-spacing: .08em;
 }
 
 .clriks-shell-status.ready .state {
-  color: #8d8d8d;
+    color: #8d8d8d;
 }
 
 .clriks-shell-status.running .state {
-  color: #f1c21b;
+    color: #f1c21b;
 }
 
 .clriks-shell-status.done .state {
-  color: #24a148;
+    color: #24a148;
 }
 
 .clriks-shell-status.error .state {
-  color: #da1e28;
+    color: #da1e28;
 }
 
 .clriks-shell-spinner {
-  min-width: 14px;
-  text-align: right;
-  color: #f1c21b;
+    min-width: 14px;
+    text-align: right;
+    color: #f1c21b;
 }
 
 .clriks-shell-progress {
-  color: #f1c21b;
-  font-family: monospace;
-  font-size: 11px;
-  line-height: 1.5;
-  white-space: pre-wrap;
+    color: #f1c21b;
+    font-family: monospace;
+    font-size: 11px;
+    line-height: 1.5;
+    white-space: pre-wrap;
 }
 
 .clriks-shell-prompt {
-  color: #24a148;
-  font-family: monospace;
-  font-weight: 700;
+    color: #24a148;
+    font-family: monospace;
+    font-weight: 700;
 }
 
 .clriks-shell-command {
-  color: #f4f4f4;
-  font-family: monospace;
-}
-
-.clriks-keyboard-open body {
-  height: 100% !important;
-  min-height: 100% !important;
-  position: fixed !important;
-  overflow: hidden !important;
-}
-
-.clriks-keyboard-open .console-log-box,
-.clriks-keyboard-open .console-log {
-  scroll-behavior: auto !important;
+    color: #f4f4f4;
+    font-family: monospace;
 }
 
 #command-input {
-  position: relative;
-  z-index: 100;
-  -webkit-user-select: text;
-  user-select: text;
-  -webkit-touch-callout: default;
+    position: relative !important;
+    z-index: 1000 !important;
+    -webkit-user-select: text !important;
+    user-select: text !important;
+    -webkit-touch-callout: default !important;
+    touch-action: manipulation;
+}
+
+/*
+ * Khi Android IME mở:
+ * không cho body/layout chạy theo bàn phím.
+ */
+html.clriks-keyboard-open,
+html.clriks-keyboard-open body {
+    position: fixed !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 100% !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+}
+
+/*
+ * Log là vùng duy nhất được phép scroll.
+ */
+html.clriks-keyboard-open .console-log-box,
+html.clriks-keyboard-open .console-log {
+    overflow-y: auto !important;
+    overscroll-behavior: contain !important;
+    scroll-behavior: auto !important;
+    -webkit-overflow-scrolling: touch;
 }
 
 @media (max-width: 700px) {
-  body {
-    touch-action: manipulation;
-  }
-
-  .console-log-box,
-  .console-log {
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-  }
+    .console-log-box,
+    .console-log {
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+    }
 }
 </style>
 

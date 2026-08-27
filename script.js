@@ -269,6 +269,7 @@ if (inputElement) {
     let shellRunning = false;
     let shellSpinnerTimer = null;
     let shellSpinnerIndex = 0;
+    let keyboardOpen = false;
 
     const spinnerFrames = [
         '⠋','⠙','⠹','⠸','⠼',
@@ -280,15 +281,6 @@ if (inputElement) {
                document.querySelector('.console-log');
     }
 
-    function shellBottom() {
-        const el = shellConsole();
-        if (!el) return;
-
-        requestAnimationFrame(() => {
-            el.scrollTop = el.scrollHeight;
-        });
-    }
-
     function shellStatus(state, text) {
         const el =
             document.querySelector('.clriks-shell-status');
@@ -298,30 +290,73 @@ if (inputElement) {
         el.className =
             'clriks-shell-status ' + state;
 
-        const label =
-            el.querySelector('.state');
+        const label = el.querySelector('.state');
 
         if (label) {
             label.textContent = text;
         }
     }
 
-    function shellSpinnerStart() {
-        const el =
-            document.querySelector('.clriks-shell-status');
+    function shellScrollBottom() {
+        const el = shellConsole();
 
         if (!el) return;
 
-        const spinner =
-            el.querySelector('.clriks-shell-spinner');
+        requestAnimationFrame(() => {
+            el.scrollTop = el.scrollHeight;
+        });
+    }
+
+    function shellLine(command) {
+        const el = shellConsole();
+
+        if (!el) return;
+
+        const row = document.createElement('div');
+
+        const prompt = document.createElement('span');
+        prompt.className = 'clriks-shell-prompt';
+        prompt.textContent = 'usr@clriks:~$ ';
+
+        const cmd = document.createElement('span');
+        cmd.className = 'clriks-shell-command';
+        cmd.textContent = command;
+
+        row.appendChild(prompt);
+        row.appendChild(cmd);
+        el.appendChild(row);
+
+        shellScrollBottom();
+    }
+
+    function shellProgress(text) {
+        const el = shellConsole();
+
+        if (!el) return;
+
+        const row = document.createElement('div');
+
+        row.className =
+            'clriks-shell-progress';
+
+        row.textContent = text;
+
+        el.appendChild(row);
+
+        shellScrollBottom();
+    }
+
+    function shellSpinnerStart() {
+        const el =
+            document.querySelector('.clriks-shell-spinner');
 
         clearInterval(shellSpinnerTimer);
 
         shellSpinnerIndex = 0;
 
         shellSpinnerTimer = setInterval(() => {
-            if (spinner) {
-                spinner.textContent =
+            if (el) {
+                el.textContent =
                     spinnerFrames[
                         shellSpinnerIndex++ %
                         spinnerFrames.length
@@ -332,65 +367,15 @@ if (inputElement) {
 
     function shellSpinnerStop() {
         clearInterval(shellSpinnerTimer);
+
         shellSpinnerTimer = null;
 
-        const spinner =
-            document.querySelector(
-                '.clriks-shell-spinner'
-            );
+        const el =
+            document.querySelector('.clriks-shell-spinner');
 
-        if (spinner) {
-            spinner.textContent = '';
+        if (el) {
+            el.textContent = '';
         }
-    }
-
-    function shellLine(command) {
-        const el = shellConsole();
-        if (!el) return;
-
-        const row =
-            document.createElement('div');
-
-        const prompt =
-            document.createElement('span');
-
-        prompt.className =
-            'clriks-shell-prompt';
-
-        prompt.textContent =
-            'usr@clriks:~$ ';
-
-        const cmd =
-            document.createElement('span');
-
-        cmd.className =
-            'clriks-shell-command';
-
-        cmd.textContent = command;
-
-        row.appendChild(prompt);
-        row.appendChild(cmd);
-
-        el.appendChild(row);
-
-        shellBottom();
-    }
-
-    function shellProgress(text) {
-        const el = shellConsole();
-        if (!el) return;
-
-        const row =
-            document.createElement('div');
-
-        row.className =
-            'clriks-shell-progress';
-
-        row.textContent = text;
-
-        el.appendChild(row);
-
-        shellBottom();
     }
 
     function shellBegin(command) {
@@ -400,11 +385,7 @@ if (inputElement) {
 
         shellRunning = true;
 
-        shellStatus(
-            'running',
-            'RUNNING'
-        );
-
+        shellStatus('running', 'RUNNING');
         shellSpinnerStart();
 
         shellLine(command);
@@ -456,55 +437,63 @@ if (inputElement) {
             success ? 'DONE' : 'ERROR'
         );
 
-        shellBottom();
+        shellScrollBottom();
 
         setTimeout(() => {
             if (!shellRunning) {
-                shellStatus(
-                    'ready',
-                    'READY'
-                );
+                shellStatus('ready', 'READY');
             }
         }, 1500);
     }
 
-    window.clriksShellBegin =
-        shellBegin;
+    window.clriksShellBegin = shellBegin;
+    window.clriksShellFinish = shellFinish;
 
-    window.clriksShellFinish =
-        shellFinish;
-
-    /*
-     * Android IME FIX
-     *
-     * Không scroll log khi input được focus.
-     * Không gọi scrollIntoView().
-     */
     const input =
-        document.getElementById(
-            'command-input'
-        );
+        document.getElementById('command-input');
 
     if (input) {
-        input.addEventListener(
-            'focus',
-            () => {
-                document.documentElement
-                    .classList.add(
-                        'clriks-keyboard-open'
-                    );
-            },
+        input.addEventListener('focus', () => {
+            keyboardOpen = true;
+
+            document.documentElement.classList.add(
+                'clriks-keyboard-open'
+            );
+        });
+
+        input.addEventListener('blur', () => {
+            keyboardOpen = false;
+
+            document.documentElement.classList.remove(
+                'clriks-keyboard-open'
+            );
+        });
+    }
+
+    /*
+     * Android visualViewport:
+     *
+     * Khi IME mở, không resize/scroll shell.
+     * Chỉ khóa body vào viewport hiện tại.
+     */
+    if (window.visualViewport) {
+        const lockViewport = () => {
+            if (!keyboardOpen) return;
+
+            document.documentElement.classList.add(
+                'clriks-keyboard-open'
+            );
+        };
+
+        window.visualViewport.addEventListener(
+            'resize',
+            lockViewport,
             { passive: true }
         );
 
-        input.addEventListener(
-            'blur',
-            () => {
-                document.documentElement
-                    .classList.remove(
-                        'clriks-keyboard-open'
-                    );
-            },
+        window.visualViewport.addEventListener(
+            'scroll',
+            lockViewport,
             { passive: true }
         );
     }
