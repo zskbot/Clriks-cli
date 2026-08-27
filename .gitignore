@@ -35,3 +35,7 @@ src/*.before-*
 # Generated design test artifacts
 data/designs/*.svg
 data/designs/*.html
+
+# Clriks runtime
+.clriks-python-agent.pid
+data/*.log
