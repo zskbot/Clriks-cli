@@ -347,6 +347,14 @@ function submitCommand() {
     const value =
         inputElement.value;
 
+    if (
+        typeof window.clriksCommandGuard ===
+            'function' &&
+        !window.clriksCommandGuard(value)
+    ) {
+        return;
+    }
+
     if (!value) {
         sendTerminalInput(
             '\n'
