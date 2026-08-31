@@ -6,6 +6,11 @@ import {
 } from 'child_process';
 import dotenv from 'dotenv';
 import path from 'path';
+import {
+    prepareWorkspace,
+    readPullRequestDiff,
+    runWorkspaceCommand
+} from './github-workflow';
 
 dotenv.config();
 
@@ -25,6 +30,92 @@ const DESIGN_DIR =
     );
 
 app.use(express.json());
+
+function githubClientId(): string {
+    const clientId = process.env.GITHUB_CLIENT_ID;
+    if (!clientId || clientId.startsWith('Iv1.demo_')) {
+        throw new Error('GITHUB_CLIENT_ID must be configured on the backend');
+    }
+    return clientId;
+}
+
+function bearerToken(header?: string): string {
+    const match = header?.match(/^Bearer\s+(.+)$/i);
+    if (!match) throw new Error('GitHub access token is required');
+    return match[1];
+}
+
+/* =========================================================
+   GITHUB AUTH + ISOLATED REPOSITORY WORKFLOW
+   ========================================================= */
+
+app.post('/auth/github/device-code', async (req, res) => {
+    try {
+        const response = await fetch('https://github.com/login/device/code', {
+            method: 'POST',
+            headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify({ client_id: githubClientId(), scope: req.body?.scope || 'repo read:user' })
+        });
+        const data = await response.json();
+        res.status(response.status).json(data);
+    } catch (error: any) {
+        res.status(500).json({ ok: false, error: error.message || String(error) });
+    }
+});
+
+app.post('/auth/github/poll', async (req, res) => {
+    try {
+        const deviceCode = String(req.body?.deviceCode || '');
+        if (!deviceCode) throw new Error('deviceCode is required');
+        const response = await fetch('https://github.com/login/oauth/access_token', {
+            method: 'POST',
+            headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                client_id: githubClientId(),
+                device_code: deviceCode,
+                grant_type: 'urn:ietf:params:oauth:grant-type:device_code'
+            })
+        });
+        const data = await response.json();
+        res.status(response.status).json(data);
+    } catch (error: any) {
+        res.status(400).json({ ok: false, error: error.message || String(error) });
+    }
+});
+
+app.post('/workspaces', async (req, res) => {
+    try {
+        const repository = String(req.body?.repository || '');
+        const ref = req.body?.ref ? String(req.body.ref) : undefined;
+        const workspace = await prepareWorkspace(repository, ref);
+        res.status(201).json({ ok: true, workspace: { id: workspace.id, repository: workspace.repository } });
+    } catch (error: any) {
+        res.status(400).json({ ok: false, error: error.message || String(error) });
+    }
+});
+
+app.post('/workspaces/:workspaceId/run', async (req, res) => {
+    try {
+        const result = await runWorkspaceCommand(
+            req.params.workspaceId,
+            String(req.body?.command || '')
+        );
+        res.status(result.exitCode === 0 ? 200 : 422).json({ ok: result.exitCode === 0, result });
+    } catch (error: any) {
+        res.status(400).json({ ok: false, error: error.message || String(error) });
+    }
+});
+
+app.post('/github/pulls/:pullNumber/review-context', async (req, res) => {
+    try {
+        const repository = String(req.body?.repository || '');
+        const accessToken = bearerToken(req.header('authorization'));
+        const diff = await readPullRequestDiff(repository, Number(req.params.pullNumber), accessToken);
+        res.json({ ok: true, repository, pullNumber: Number(req.params.pullNumber), diff });
+    } catch (error: any) {
+        res.status(400).json({ ok: false, error: error.message || String(error) });
+    }
+});
 
 /* =========================================================
    DESIGN ENGINE
