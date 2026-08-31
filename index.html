@@ -17,6 +17,29 @@
         .cursor-blink { animation: blink 1s infinite; }
         .status-dot { width: .5rem; height: .5rem; border-radius: 999px; display: inline-block; margin-right: .35rem; }
         @keyframes blink { 50% { opacity: 0; } }
+
+        /* App menu inspired by the compact settings sheet on mobile. */
+        .menu-button { border: 1px solid #393939; border-radius: 999px; padding: .45rem .75rem; font-size: 11px; color: #f4f4f4; background: #161616; }
+        .menu-button:hover { border-color: #0f62fe; background: #0f62fe22; }
+        .settings-backdrop { position: fixed; inset: 0; z-index: 80; background: rgba(0,0,0,.7); backdrop-filter: blur(3px); }
+        .settings-sheet { position: fixed; z-index: 81; top: 0; right: 0; bottom: 0; width: min(92vw, 410px); padding: 32px 26px; overflow-y: auto; background: #101010; border-left: 1px solid #393939; box-shadow: -20px 0 80px rgba(0,0,0,.55); }
+        .settings-link { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 13px 0; color: #f4f4f4; font-family: inherit; font-size: 16px; text-align: left; background: transparent; border: 0; border-bottom: 1px solid #242424; }
+        .settings-link:hover { color: #78a9ff; }
+        .settings-link small { color: #8d8d8d; font-size: 11px; }
+        .github-link { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin: 22px 0 12px; padding: 12px; border-radius: 8px; color: #fff; font-size: 13px; font-weight: 700; background: #24292f; border: 1px solid #4b5563; text-decoration: none; }
+        .github-link:hover { background: #30363d; text-decoration: none; }
+        .plus-button { position: fixed; z-index: 60; right: max(20px, calc((100vw - 448px) / 2 + 20px)); bottom: 88px; display: grid; width: 52px; height: 52px; place-items: center; border-radius: 999px; color: white; font-size: 28px; line-height: 1; background: #0f62fe; border: 1px solid #78a9ff; box-shadow: 0 12px 32px rgba(15,98,254,.35); }
+        .plus-button:hover { background: #0353e9; transform: translateY(-1px); }
+        .dialog-backdrop { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 20px; background: rgba(0,0,0,.75); }
+        .task-dialog { width: min(100%, 420px); padding: 22px; border: 1px solid #393939; border-radius: 14px; background: #161616; box-shadow: 0 24px 80px rgba(0,0,0,.65); }
+        .form-label { display: block; margin: 16px 0 7px; color: #c6c6c6; font-size: 12px; font-weight: 700; }
+        .form-field { width: 100%; border: 1px solid #525252; border-radius: 6px; padding: 10px; color: #f4f4f4; font: inherit; font-size: 14px; background: #262626; }
+        .form-field:focus { outline: 2px solid #0f62fe; outline-offset: 1px; }
+        .repo-required { color: #ffb3b8; font-size: 11px; margin-top: 7px; }
+        .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+        .dialog-actions button { padding: 9px 13px; border: 1px solid #525252; border-radius: 6px; font: inherit; font-size: 12px; color: white; background: #262626; }
+        .dialog-actions .primary { background: #0f62fe; border-color: #0f62fe; }
+        [hidden] { display: none !important; }
     </style>
 
 <style id="clriks-mobile-fix">
@@ -192,8 +215,9 @@ html {
         <div class="text-[10px] uppercase tracking-widest text-[#8d8d8d]">
             System: <span id="auth-state" class="text-[#f1c21b]">Guest</span>
         </div>
-        <div class="text-[10px] uppercase tracking-widest text-[#8d8d8d]">
-            Agent: <span class="text-[#0f62fe]">LLM READY</span>
+        <div class="flex items-center gap-2">
+            <div class="text-[10px] uppercase tracking-widest text-[#8d8d8d]">Agent: <span class="text-[#0f62fe]">LLM READY</span></div>
+            <button id="open-settings" class="menu-button" aria-haspopup="dialog" aria-controls="settings-menu">☰ Menu</button>
         </div>
     </header>
 
@@ -240,6 +264,38 @@ html {
         <div class="text-center border-r border-[#393939]"><p class="text-[8px] text-[#8d8d8d] uppercase italic">Repo</p><p id="repo-stat" class="text-xs font-bold">unset</p></div>
         <div class="text-center"><p class="text-[8px] text-[#8d8d8d] uppercase italic">Region</p><p id="region-stat" class="text-xs font-bold">VN-S1</p></div>
     </footer>
+
+    <button id="open-task-dialog" class="plus-button" type="button" aria-label="Tạo tác vụ mới">+</button>
+
+    <div id="settings-backdrop" class="settings-backdrop" hidden></div>
+    <aside id="settings-menu" class="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settings-title" hidden>
+        <div class="flex items-center justify-between mb-7">
+            <h2 id="settings-title" class="text-2xl font-semibold text-white">Cài đặt</h2>
+            <button id="close-settings" class="text-3xl leading-none text-[#c6c6c6]" aria-label="Đóng menu">×</button>
+        </div>
+        <button class="settings-link" data-settings-action="general">Chung <small>›</small></button>
+        <button class="settings-link" data-settings-action="environment">Môi trường <small>›</small></button>
+        <button class="settings-link" data-settings-action="review">Xem lại mã <small>›</small></button>
+        <button class="settings-link" data-settings-action="connection">Trình kết nối <small>›</small></button>
+        <button class="settings-link" data-settings-action="analytics">Phân tích <small>›</small></button>
+        <button class="settings-link" data-settings-action="data">Kiểm soát dữ liệu <small>›</small></button>
+        <button class="settings-link" data-settings-action="repo">Repository bắt buộc <small id="menu-repo-state">Chưa chọn</small></button>
+        <a class="github-link" href="https://github.com/login" target="_blank" rel="noopener noreferrer">⌘ Kết nối GitHub <span aria-hidden="true">↗</span></a>
+        <p class="text-[11px] leading-5 text-[#8d8d8d]">Chọn repository trước khi tạo task, chạy test, mở PR hoặc review code.</p>
+    </aside>
+
+    <div id="task-backdrop" class="dialog-backdrop" hidden>
+        <form id="task-dialog" class="task-dialog" aria-labelledby="task-dialog-title">
+            <div class="flex items-center justify-between"><h2 id="task-dialog-title" class="text-lg font-semibold text-white">Tạo tác vụ</h2><button id="close-task-dialog" type="button" class="text-2xl text-[#c6c6c6]" aria-label="Đóng">×</button></div>
+            <p class="mt-2 text-xs leading-5 text-[#8d8d8d]">Thiết lập repo trước, sau đó tạo workflow test hoặc PR review.</p>
+            <label class="form-label" for="task-repository">GitHub repository <span class="text-[#ff8389]">*</span></label>
+            <input id="task-repository" class="form-field" autocomplete="off" placeholder="owner/repository" required pattern="[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+">
+            <p id="repo-required-message" class="repo-required">Repository là bắt buộc.</p>
+            <label class="form-label" for="task-command">Tác vụ</label>
+            <select id="task-command" class="form-field"><option value="npm test">Chạy npm test</option><option value="review">Review pull request</option><option value="pr">Tạo pull request</option></select>
+            <div class="dialog-actions"><button id="cancel-task" type="button">Hủy</button><button class="primary" type="submit">Tiếp tục</button></div>
+        </form>
+    </div>
 
 
 <style id="clriks-shell-mobile-fix">
@@ -370,7 +426,7 @@ main,
 <script>
 const state = {
   token: localStorage.getItem('clriks.githubToken') || '',
-  repo: localStorage.getItem('clriks.repo') || 'owner/repo',
+  repo: localStorage.getItem('clriks.repo') || '',
   memory: localStorage.getItem('clriks.memory') || '128MB',
   region: localStorage.getItem('clriks.region') || 'VN-S1'
 };
@@ -395,7 +451,7 @@ function logLine(message, color = 'text-[#8d8d8d]'){
 function syncStats(){
   document.getElementById('auth-state').textContent = state.token ? 'GitHub Authenticated' : 'Guest';
   document.getElementById('auth-state').className = state.token ? 'text-[#24a148]' : 'text-[#f1c21b]';
-  document.getElementById('repo-stat').textContent = state.repo;
+  document.getElementById('repo-stat').textContent = state.repo || 'required';
   document.getElementById('memory-stat').textContent = state.memory;
   document.getElementById('region-stat').textContent = state.region;
 }
@@ -428,22 +484,17 @@ function planWithLlm(command){
 }
 
 function executeCommand(raw){
-  const shellCommand = String(raw || '').trim();
-
-  if (
-    shellCommand &&
-    typeof window.clriksShellBegin === 'function'
-  ) {
-    window.clriksShellBegin(shellCommand);
-  }
-
   const command = raw.trim();
   if(!command) return;
   logLine(`<span class="text-white">usr@clriks:~$ ${escapeHtml(command)}</span>`, 'text-white');
 
   if(command === 'login') return simulateDeviceFlow();
   if(command.startsWith('set repo ')){
-    state.repo = command.replace('set repo ', '').trim() || state.repo;
+    const repository = command.replace('set repo ', '').trim();
+    if(!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)){
+      return logLine('[ERROR] Repo phải có định dạng owner/repository.', 'text-[#da1e28]');
+    }
+    state.repo = repository;
     localStorage.setItem('clriks.repo', state.repo); syncStats();
     return logLine(`[OK] Repo hiện tại: ${escapeHtml(state.repo)}`, 'text-[#24a148]');
   }
@@ -490,6 +541,11 @@ function executeCommand(raw){
     }
 
     const plan = planWithLlm(command);
+  if(['CREATE_TASK', 'CREATE_PR', 'RUN_BASH', 'REVIEW_CODE'].includes(plan.action) && !state.repo){
+    logLine('[ACTION REQUIRED] Hãy chọn GitHub repository trước khi chạy tác vụ.', 'text-[#da1e28]');
+    openTaskDialog();
+    return;
+  }
   logLine('LLM function_call → <code>' + escapeHtml(JSON.stringify(plan)) + '</code>', 'text-[#be95ff]');
   if(plan.action === 'CREATE_TASK') logLine(`Octokit issues.create({ repo:"${escapeHtml(state.repo)}", title:"${escapeHtml(plan.title)}" })`, 'text-[#24a148]');
   if(plan.action === 'CREATE_PR') logLine(`Workflow: ${plan.steps.join(' → ')} → gh pr create --repo ${escapeHtml(state.repo)}`, 'text-[#0f62fe]');
@@ -503,6 +559,44 @@ function renderPanel(name){
   panels[name].forEach(item => logLine(escapeHtml(item), item.startsWith('#') ? 'text-white' : 'text-[#8d8d8d]'));
 }
 
+function toggleSettings(open){
+  const menu = document.getElementById('settings-menu');
+  const backdrop = document.getElementById('settings-backdrop');
+  menu.hidden = !open;
+  backdrop.hidden = !open;
+  if(open){
+    document.getElementById('menu-repo-state').textContent = state.repo || 'Chưa chọn';
+    document.getElementById('close-settings').focus();
+  }
+}
+
+function openTaskDialog(){
+  const backdrop = document.getElementById('task-backdrop');
+  const repository = document.getElementById('task-repository');
+  repository.value = state.repo;
+  document.getElementById('repo-required-message').hidden = Boolean(state.repo);
+  backdrop.hidden = false;
+  setTimeout(() => repository.focus(), 0);
+}
+
+function closeTaskDialog(){ document.getElementById('task-backdrop').hidden = true; }
+
+function selectRepository(){
+  toggleSettings(false);
+  openTaskDialog();
+}
+
+window.clriksCommandGuard = function(command){
+  const plan = planWithLlm(String(command || '').trim());
+  const requiresRepository = ['CREATE_TASK', 'CREATE_PR', 'RUN_BASH', 'REVIEW_CODE'].includes(plan.action);
+  if(requiresRepository && !state.repo){
+    logLine('[ACTION REQUIRED] Hãy chọn GitHub repository trước khi chạy tác vụ.', 'text-[#da1e28]');
+    openTaskDialog();
+    return false;
+  }
+  return true;
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   syncStats();
   logLine('Initializing Clriks-cli Agent Console...', 'text-[#8d8d8d]');
@@ -515,6 +609,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const input = document.getElementById('command-input'); executeCommand(input.value); input.value = ''; input.focus();
   });
   document.querySelectorAll('[data-panel]').forEach(btn => btn.addEventListener('click', () => renderPanel(btn.dataset.panel)));
+  document.getElementById('open-settings').addEventListener('click', () => toggleSettings(true));
+  document.getElementById('close-settings').addEventListener('click', () => toggleSettings(false));
+  document.getElementById('settings-backdrop').addEventListener('click', () => toggleSettings(false));
+  document.getElementById('open-task-dialog').addEventListener('click', openTaskDialog);
+  document.getElementById('close-task-dialog').addEventListener('click', closeTaskDialog);
+  document.getElementById('cancel-task').addEventListener('click', closeTaskDialog);
+  document.querySelectorAll('[data-settings-action]').forEach(button => button.addEventListener('click', () => {
+    if(button.dataset.settingsAction === 'repo') return selectRepository();
+    logLine(`Mở mục cài đặt: ${button.textContent.trim()}`, 'text-[#0f62fe]');
+  }));
+  document.getElementById('task-dialog').addEventListener('submit', event => {
+    event.preventDefault();
+    const repository = document.getElementById('task-repository').value.trim();
+    if(!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)){
+      document.getElementById('repo-required-message').hidden = false;
+      return;
+    }
+    state.repo = repository;
+    localStorage.setItem('clriks.repo', state.repo);
+    syncStats();
+    closeTaskDialog();
+    const task = document.getElementById('task-command').value;
+    logLine(`[OK] Đã chọn repository: ${escapeHtml(state.repo)}`, 'text-[#24a148]');
+    executeCommand(task === 'review' ? 'review current' : task === 'pr' ? 'pr cập nhật từ menu' : `bash ${task}`);
+  });
+  document.addEventListener('keydown', event => {
+    if(event.key === 'Escape'){ toggleSettings(false); closeTaskDialog(); }
+  });
 });
 </script>
 
