@@ -14,3 +14,28 @@ test_gen
 test_gen.caches
 TEST-*.xml
 junit*.properties
+
+node_modules/
+dist/
+.env
+*.pid
+*.log
+
+# Clriks local runtime
+node_modules/
+dist/
+.env
+*.pid
+*.log
+
+# Local backups
+src/*.before-*
+*.before-python-design
+
+# Generated design test artifacts
+data/designs/*.svg
+data/designs/*.html
+
+# Clriks runtime
+.clriks-python-agent.pid
+data/*.log

@@ -1,0 +1,9 @@
+# Clriks Python Design Engine
+# Core engine uses Python standard library only.
+#
+# Future optional graphics/AI:
+# pillow
+# opencv-python
+# numpy
+# torch
+# transformers
