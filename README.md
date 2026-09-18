@@ -41,9 +41,10 @@ Khởi động backend bằng `npm run dev`, sau đó frontend gọi các API sa
 
 1. `POST /auth/github/device-code` nhận `device_code`, `user_code` và `verification_uri` của GitHub Device Flow. Hiển thị `user_code` để người dùng xác thực tài khoản GitHub.
 2. Poll `POST /auth/github/poll` với `{ "deviceCode": "..." }` theo `interval` GitHub trả về cho đến khi nhận `access_token`.
-3. `POST /workspaces` với `{ "repository": "owner/repo", "ref": "main" }` để clone shallow vào thư mục tạm riêng biệt. Chỉ repository/ref hợp lệ mới được chấp nhận.
-4. `POST /workspaces/:workspaceId/run` với `{ "command": "npm test" }` để chạy install/test/lint đã allow-list. Lệnh được gọi bằng argv (không qua `bash -c`), giới hạn 10 phút và tối đa 256 KiB output.
-5. `POST /github/pulls/:pullNumber/review-context` với body `{ "repository": "owner/repo" }` và `Authorization: Bearer <access_token>` để lấy diff PR phục vụ LLM review. Endpoint này chỉ đọc; việc ghi review phải là một endpoint riêng có xác nhận người dùng.
+3. `GET /github/account` kiểm tra access token và trả về tài khoản GitHub đang kết nối; `GET /github/repositories/:owner/:repo` xác nhận repository mà tài khoản có thể truy cập trước khi lưu lựa chọn trên giao diện.
+4. `POST /workspaces` với `{ "repository": "owner/repo", "ref": "main" }` để clone shallow vào thư mục tạm riêng biệt. Chỉ repository/ref hợp lệ mới được chấp nhận.
+5. `POST /workspaces/:workspaceId/run` với `{ "command": "npm test" }` để chạy install/test/lint đã allow-list. Lệnh được gọi bằng argv (không qua `bash -c`), giới hạn 10 phút và tối đa 256 KiB output.
+6. `POST /github/pulls/:pullNumber/review-context` với body `{ "repository": "owner/repo" }` và `Authorization: Bearer <access_token>` để lấy diff PR phục vụ LLM review. Endpoint này chỉ đọc; việc ghi review phải là một endpoint riêng có xác nhận người dùng.
 
 Ví dụ chạy test:
 

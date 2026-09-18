@@ -83,6 +83,58 @@ app.post('/auth/github/poll', async (req, res) => {
     }
 });
 
+app.get('/github/account', async (req, res) => {
+    try {
+        const accessToken = bearerToken(req.header('authorization'));
+        const response = await fetch('https://api.github.com/user', {
+            headers: {
+                Accept: 'application/vnd.github+json',
+                Authorization: `Bearer ${accessToken}`,
+                'User-Agent': 'clriks-cli'
+            }
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || `GitHub account request failed (${response.status})`);
+        }
+        res.json({ ok: true, account: { login: data.login, name: data.name, avatarUrl: data.avatar_url } });
+    } catch (error: any) {
+        res.status(401).json({ ok: false, error: error.message || String(error) });
+    }
+});
+
+app.get('/github/repositories/:owner/:repo', async (req, res) => {
+    try {
+        const repository = `${req.params.owner}/${req.params.repo}`;
+        if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
+            throw new Error('repository must use the owner/repository format');
+        }
+        const accessToken = bearerToken(req.header('authorization'));
+        const response = await fetch(`https://api.github.com/repos/${repository}`, {
+            headers: {
+                Accept: 'application/vnd.github+json',
+                Authorization: `Bearer ${accessToken}`,
+                'User-Agent': 'clriks-cli'
+            }
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || `GitHub repository request failed (${response.status})`);
+        }
+        res.json({
+            ok: true,
+            repository: {
+                fullName: data.full_name,
+                defaultBranch: data.default_branch,
+                private: data.private,
+                permissions: data.permissions
+            }
+        });
+    } catch (error: any) {
+        res.status(400).json({ ok: false, error: error.message || String(error) });
+    }
+});
+
 app.post('/workspaces', async (req, res) => {
     try {
         const repository = String(req.body?.repository || '');
@@ -249,6 +301,14 @@ app.use(
     '/designs',
     express.static(DESIGN_DIR)
 );
+
+app.get('/', (_req, res) => {
+    res.sendFile(path.resolve(process.cwd(), 'index.html'));
+});
+
+app.get('/script.js', (_req, res) => {
+    res.sendFile(path.resolve(process.cwd(), 'script.js'));
+});
 
 /* =========================================================
    HTTP
