@@ -1,6 +1,6 @@
 const CLRICKS_BACKEND_URL =
     window.CLRICKS_BACKEND_URL ||
-    'https://united-leasing-tmp-neural.trycloudflare.com';
+    window.location.origin;
 
 const CLRICKS_WS_URL =
     CLRICKS_BACKEND_URL
@@ -9,6 +9,8 @@ const CLRICKS_WS_URL =
 
 let clriksSocket = null;
 let clriksReconnectTimer = null;
+const terminalHistory = [];
+let terminalHistoryIndex = -1;
 
 const inputElement =
     document.getElementById('command-input');
@@ -50,14 +52,8 @@ function appendConsole(
             'text-[#24a148]';
     }
 
-    if (
-        typeof window.logLine ===
-        'function'
-    ) {
-        window.logLine(
-            escapeHtml(message),
-            css
-        );
+    if (typeof window.appendClriksTerminalOutput === 'function') {
+        window.appendClriksTerminalOutput(message, type, css);
         return;
     }
 
@@ -84,6 +80,17 @@ function appendConsole(
         log.scrollHeight;
 }
 
+function setTerminalConnectionStatus(status) {
+    const element = document.getElementById('terminal-connection');
+    if (!element) return;
+    element.textContent = status;
+    element.className = status === 'CONNECTED'
+        ? 'text-[#24a148]'
+        : status === 'CONNECTING'
+            ? 'text-[#f1c21b]'
+            : 'text-[#da1e28]';
+}
+
 /* =========================================================
    WEBSOCKET
    ========================================================= */
@@ -106,6 +113,8 @@ function connectClriksWebSocket() {
         clriksReconnectTimer
     );
 
+    setTerminalConnectionStatus('CONNECTING');
+
     const socket =
         new WebSocket(
             CLRICKS_WS_URL
@@ -116,6 +125,8 @@ function connectClriksWebSocket() {
 
     socket.onopen =
         () => {
+
+            setTerminalConnectionStatus('CONNECTED');
 
             appendConsole(
                 '[WebSocket] Persistent Bash connected',
@@ -234,14 +245,18 @@ function connectClriksWebSocket() {
     socket.onerror =
         (error) => {
 
+            setTerminalConnectionStatus('OFFLINE');
+
             console.error(
-                '[Clriks WS] error',
+                '[Command Prompt WS] error',
                 error
             );
         };
 
     socket.onclose =
         () => {
+
+            setTerminalConnectionStatus('OFFLINE');
 
             if (
                 clriksSocket === socket
@@ -344,30 +359,27 @@ function submitCommand() {
         return;
     }
 
-    const value =
-        inputElement.value;
+    const value = inputElement.value;
 
-    if (
-        typeof window.clriksCommandGuard ===
-            'function' &&
-        !window.clriksCommandGuard(value)
-    ) {
+    if (value.trim()) {
+        terminalHistory.push(value);
+        terminalHistoryIndex = terminalHistory.length;
+    }
+
+    if (typeof window.executeClriksCommand === 'function') {
+        window.executeClriksCommand(value);
+        inputElement.value = '';
+        inputElement.focus();
         return;
     }
 
     if (!value) {
-        sendTerminalInput(
-            '\n'
-        );
+        sendTerminalInput('\n');
         return;
     }
 
-    sendTerminalInput(
-        value + '\n'
-    );
-
+    sendTerminalInput(value + '\n');
     inputElement.value = '';
-
     inputElement.focus();
 }
 
@@ -458,6 +470,22 @@ if (inputElement) {
                     '\t'
                 );
 
+                return;
+            }
+
+            if (event.key === 'ArrowUp') {
+                if (!terminalHistory.length) return;
+                event.preventDefault();
+                terminalHistoryIndex = Math.max(0, terminalHistoryIndex - 1);
+                inputElement.value = terminalHistory[terminalHistoryIndex] || '';
+                return;
+            }
+
+            if (event.key === 'ArrowDown') {
+                if (!terminalHistory.length) return;
+                event.preventDefault();
+                terminalHistoryIndex = Math.min(terminalHistory.length, terminalHistoryIndex + 1);
+                inputElement.value = terminalHistory[terminalHistoryIndex] || '';
                 return;
             }
 
@@ -570,6 +598,7 @@ window.clriksSubmitCommand =
 
 window.connectClriksWebSocket =
     connectClriksWebSocket;
+window.CLRICKS_TERMINAL_CONTROLS_INPUT = true;
 
 /* =========================================================
    START

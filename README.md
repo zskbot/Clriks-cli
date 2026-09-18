@@ -2,11 +2,11 @@
 
 Frontend tĩnh nên gọi backend Node.js/Python bảo vệ secret và quyền ghi repository. Repository này hiện đã có backend Node.js cho OAuth GitHub, checkout repository tạm thời và chạy test theo allow-list.
 
-Clriks-cli là giao diện **Agent IDE Shell** mô phỏng trải nghiệm Termux/shell ngay trong UI web, đồng thời tích hợp luồng agent để tự động hóa GitHub giống Codex.
+Command Prompt là giao diện **web shell** mô phỏng trải nghiệm Termux/shell ngay trong UI web, đồng thời tích hợp luồng agent để tự động hóa GitHub giống Codex.
 
 ## Tính năng UI hiện có
 
-- Terminal log động với prompt kiểu shell (`u0@clriks:~$`).
+- Command Prompt web kết nối WebSocket vào Bash PTY của backend, với prompt Termux (`u0@termux:~$`), stdout/stderr thời gian thực, Ctrl+C/Ctrl+D/Ctrl+L, Tab và lịch sử lệnh bằng phím mũi tên.
 - Package manager demo giống Termux: `pkg update`, `pkg upgrade`, `pkg install`, `pkg remove`, `pkg list`.
 - File-system command demo: `ls`, `pwd`, `cd`, `mkdir`, `touch`, `cat`, `echo`, `clear`.
 - Agent IDE command: `agent task ...`, `agent pr ...`, `review <pr>`, `bash <command>`.
@@ -15,12 +15,28 @@ Clriks-cli là giao diện **Agent IDE Shell** mô phỏng trải nghiệm Termu
 - Quick action buttons để chạy nhanh `pkg update`, `pkg install nodejs`, tạo PR bằng agent và review PR.
 - Trạng thái shell được lưu bằng `localStorage`: package đã cài, thư mục hiện tại, repo, token demo và memory.
 
+
+## Quy tắc sử dụng bắt buộc
+
+Trước khi chạy lệnh lần đầu, người dùng **phải** gõ `rules`, đọc quy tắc và gõ `accept rules`. Command Prompt chặn mọi lệnh khác cho đến khi xác nhận.
+
+1. Chỉ sử dụng môi trường và repository mà bạn được ủy quyền.
+2. Không nhập token, mật khẩu, private key hoặc dữ liệu bí mật vào terminal hay log.
+3. Kiểm tra kỹ lệnh trước khi chạy; không chạy lệnh xóa/phá hủy dữ liệu hoặc lệnh không rõ nguồn gốc.
+4. Xác minh `owner/repository` trước mọi thao tác GitHub có thể thay đổi dữ liệu.
+5. Lỗi terminal hiển thị **màu đỏ**. Đọc và sửa nguyên nhân thay vì lặp lại thao tác nguy hiểm.
+
 ## Lệnh demo
 
 ```text
+rules
+accept rules
 login
 task thêm API kết nối GitHub
 pr sửa lỗi giao diện dashboard
+ls -la
+git status
+npm test
 bash gh pr list
 review 12
 set repo owner/project
@@ -41,9 +57,10 @@ Khởi động backend bằng `npm run dev`, sau đó frontend gọi các API sa
 
 1. `POST /auth/github/device-code` nhận `device_code`, `user_code` và `verification_uri` của GitHub Device Flow. Hiển thị `user_code` để người dùng xác thực tài khoản GitHub.
 2. Poll `POST /auth/github/poll` với `{ "deviceCode": "..." }` theo `interval` GitHub trả về cho đến khi nhận `access_token`.
-3. `POST /workspaces` với `{ "repository": "owner/repo", "ref": "main" }` để clone shallow vào thư mục tạm riêng biệt. Chỉ repository/ref hợp lệ mới được chấp nhận.
-4. `POST /workspaces/:workspaceId/run` với `{ "command": "npm test" }` để chạy install/test/lint đã allow-list. Lệnh được gọi bằng argv (không qua `bash -c`), giới hạn 10 phút và tối đa 256 KiB output.
-5. `POST /github/pulls/:pullNumber/review-context` với body `{ "repository": "owner/repo" }` và `Authorization: Bearer <access_token>` để lấy diff PR phục vụ LLM review. Endpoint này chỉ đọc; việc ghi review phải là một endpoint riêng có xác nhận người dùng.
+3. `GET /github/account` kiểm tra access token và trả về tài khoản GitHub đang kết nối; `GET /github/repositories/:owner/:repo` xác nhận repository mà tài khoản có thể truy cập trước khi lưu lựa chọn trên giao diện.
+4. `POST /workspaces` với `{ "repository": "owner/repo", "ref": "main" }` để clone shallow vào thư mục tạm riêng biệt. Chỉ repository/ref hợp lệ mới được chấp nhận.
+5. `POST /workspaces/:workspaceId/run` với `{ "command": "npm test" }` để chạy install/test/lint đã allow-list. Lệnh được gọi bằng argv (không qua `bash -c`), giới hạn 10 phút và tối đa 256 KiB output.
+6. `POST /github/pulls/:pullNumber/review-context` với body `{ "repository": "owner/repo" }` và `Authorization: Bearer <access_token>` để lấy diff PR phục vụ LLM review. Endpoint này chỉ đọc; việc ghi review phải là một endpoint riêng có xác nhận người dùng.
 
 Ví dụ chạy test:
 
