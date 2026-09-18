@@ -1,6 +1,6 @@
 const CLRICKS_BACKEND_URL =
     window.CLRICKS_BACKEND_URL ||
-    'https://united-leasing-tmp-neural.trycloudflare.com';
+    window.location.origin;
 
 const CLRICKS_WS_URL =
     CLRICKS_BACKEND_URL
@@ -344,30 +344,22 @@ function submitCommand() {
         return;
     }
 
-    const value =
-        inputElement.value;
+    const value = inputElement.value;
 
-    if (
-        typeof window.clriksCommandGuard ===
-            'function' &&
-        !window.clriksCommandGuard(value)
-    ) {
+    if (typeof window.executeClriksCommand === 'function') {
+        window.executeClriksCommand(value);
+        inputElement.value = '';
+        inputElement.focus();
         return;
     }
 
     if (!value) {
-        sendTerminalInput(
-            '\n'
-        );
+        sendTerminalInput('\n');
         return;
     }
 
-    sendTerminalInput(
-        value + '\n'
-    );
-
+    sendTerminalInput(value + '\n');
     inputElement.value = '';
-
     inputElement.focus();
 }
 
@@ -570,6 +562,7 @@ window.clriksSubmitCommand =
 
 window.connectClriksWebSocket =
     connectClriksWebSocket;
+window.CLRICKS_TERMINAL_CONTROLS_INPUT = true;
 
 /* =========================================================
    START

@@ -280,7 +280,7 @@ html {
         <button class="settings-link" data-settings-action="analytics">Phân tích <small>›</small></button>
         <button class="settings-link" data-settings-action="data">Kiểm soát dữ liệu <small>›</small></button>
         <button class="settings-link" data-settings-action="repo">Repository bắt buộc <small id="menu-repo-state">Chưa chọn</small></button>
-        <a class="github-link" href="https://github.com/login" target="_blank" rel="noopener noreferrer">⌘ Kết nối GitHub <span aria-hidden="true">↗</span></a>
+        <button id="connect-github" class="github-link" type="button">⌘ Kết nối GitHub <span aria-hidden="true">↗</span></button>
         <p class="text-[11px] leading-5 text-[#8d8d8d]">Chọn repository trước khi tạo task, chạy test, mở PR hoặc review code.</p>
     </aside>
 
@@ -426,6 +426,7 @@ main,
 <script>
 const state = {
   token: localStorage.getItem('clriks.githubToken') || '',
+  account: localStorage.getItem('clriks.githubAccount') || '',
   repo: localStorage.getItem('clriks.repo') || '',
   memory: localStorage.getItem('clriks.memory') || '128MB',
   region: localStorage.getItem('clriks.region') || 'VN-S1'
@@ -449,30 +450,81 @@ function logLine(message, color = 'text-[#8d8d8d]'){
   log.scrollTop = log.scrollHeight;
 }
 function syncStats(){
-  document.getElementById('auth-state').textContent = state.token ? 'GitHub Authenticated' : 'Guest';
+  document.getElementById('auth-state').textContent = state.token ? (state.account || 'GitHub connected') : 'Guest';
   document.getElementById('auth-state').className = state.token ? 'text-[#24a148]' : 'text-[#f1c21b]';
   document.getElementById('repo-stat').textContent = state.repo || 'required';
   document.getElementById('memory-stat').textContent = state.memory;
   document.getElementById('region-stat').textContent = state.region;
 }
 
-function simulateDeviceFlow(){
-  logLine('POST https://github.com/login/device/code client_id=CLRKS_CLIENT_ID scope=repo workflow', 'text-white');
-  const userCode = 'CLR-' + Math.random().toString(36).slice(2, 6).toUpperCase();
-  logLine(`[ACTION] Mở https://github.com/login/device và nhập mã <b>${userCode}</b>`, 'text-[#f1c21b]');
-  let ticks = 0;
-  const poller = setInterval(() => {
-    ticks += 1;
-    logLine(`Polling token (${ticks}/3) interval=5s...`, 'text-[#8d8d8d]');
-    if(ticks === 3){
-      clearInterval(poller);
-      state.token = 'gho_demo_token_' + Date.now();
-      localStorage.setItem('clriks.githubToken', state.token);
-      syncStats();
-      logLine('[OK] Đã nhận access_token và lưu cục bộ cho phiên demo.', 'text-[#24a148]');
-    }
-  }, 700);
+const backendUrl = window.CLRICKS_BACKEND_URL || window.location.origin;
+const repositoryPattern = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+
+async function backendRequest(path, options = {}) {
+  const headers = new Headers(options.headers || {});
+  if(state.token) headers.set('Authorization', `Bearer ${state.token}`);
+  const response = await fetch(`${backendUrl}${path}`, { ...options, headers });
+  const data = await response.json().catch(() => ({}));
+  if(!response.ok || !data.ok) throw new Error(data.error || `Backend HTTP ${response.status}`);
+  return data;
 }
+
+async function confirmGithubAccount(){
+  const data = await backendRequest('/github/account');
+  state.account = data.account.login;
+  localStorage.setItem('clriks.githubAccount', state.account);
+  syncStats();
+  return data.account;
+}
+
+async function startDeviceFlow(){
+  try {
+    logLine('Đang kết nối backend để bắt đầu GitHub Device Flow...', 'text-white');
+    const data = await backendRequest('/auth/github/device-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scope: 'repo read:user' })
+    });
+    logLine(`[ACTION] Mở <a class="underline" target="_blank" rel="noopener noreferrer" href="${escapeHtml(data.verification_uri)}">${escapeHtml(data.verification_uri)}</a> và nhập mã <b>${escapeHtml(data.user_code)}</b>.`, 'text-[#f1c21b]');
+    window.open(data.verification_uri, '_blank', 'noopener');
+    const interval = Math.max(Number(data.interval || 5), 2) * 1000;
+    const expiresAt = Date.now() + Number(data.expires_in || 900) * 1000;
+    while(Date.now() < expiresAt){
+      await new Promise(resolve => setTimeout(resolve, interval));
+      const poll = await fetch(`${backendUrl}/auth/github/poll`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceCode: data.device_code })
+      });
+      const result = await poll.json().catch(() => ({}));
+      if(result.access_token){
+        state.token = result.access_token;
+        localStorage.setItem('clriks.githubToken', state.token);
+        const account = await confirmGithubAccount();
+        logLine(`[OK] Đã kết nối tài khoản GitHub: ${escapeHtml(account.login)}.`, 'text-[#24a148]');
+        return;
+      }
+      if(!['authorization_pending', 'slow_down'].includes(result.error)){
+        throw new Error(result.error_description || result.error || 'GitHub authorization failed');
+      }
+      logLine('Đang chờ xác nhận GitHub...', 'text-[#8d8d8d]');
+    }
+    throw new Error('GitHub device code đã hết hạn. Hãy thử kết nối lại.');
+  } catch(error) {
+    logLine(`[ERROR] Không thể kết nối GitHub: ${escapeHtml(error.message || String(error))}`, 'text-[#da1e28]');
+  }
+}
+
+async function connectRepository(repository){
+  if(!state.token) throw new Error('Hãy kết nối tài khoản GitHub trước.');
+  if(!repositoryPattern.test(repository)) throw new Error('Repo phải có định dạng owner/repository.');
+  const [owner, repo] = repository.split('/');
+  const data = await backendRequest(`/github/repositories/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`);
+  state.repo = data.repository.fullName;
+  localStorage.setItem('clriks.repo', state.repo);
+  syncStats();
+  return data.repository;
+}
+
 
 function planWithLlm(command){
   const lower = command.toLowerCase();
@@ -488,15 +540,16 @@ function executeCommand(raw){
   if(!command) return;
   logLine(`<span class="text-white">usr@clriks:~$ ${escapeHtml(command)}</span>`, 'text-white');
 
-  if(command === 'login') return simulateDeviceFlow();
+  if(command === 'login') return startDeviceFlow();
   if(command.startsWith('set repo ')){
     const repository = command.replace('set repo ', '').trim();
     if(!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)){
       return logLine('[ERROR] Repo phải có định dạng owner/repository.', 'text-[#da1e28]');
     }
-    state.repo = repository;
-    localStorage.setItem('clriks.repo', state.repo); syncStats();
-    return logLine(`[OK] Repo hiện tại: ${escapeHtml(state.repo)}`, 'text-[#24a148]');
+    connectRepository(repository)
+      .then(repo => logLine(`[OK] Đã kết nối repository: ${escapeHtml(repo.fullName)} (${escapeHtml(repo.defaultBranch)})`, 'text-[#24a148]'))
+      .catch(error => logLine(`[ERROR] Không thể kết nối repository: ${escapeHtml(error.message || String(error))}`, 'text-[#da1e28]'));
+    return;
   }
   if(command.startsWith('set memory ')){
     state.memory = command.replace('set memory ', '').trim() || state.memory;
@@ -549,7 +602,12 @@ function executeCommand(raw){
   logLine('LLM function_call → <code>' + escapeHtml(JSON.stringify(plan)) + '</code>', 'text-[#be95ff]');
   if(plan.action === 'CREATE_TASK') logLine(`Octokit issues.create({ repo:"${escapeHtml(state.repo)}", title:"${escapeHtml(plan.title)}" })`, 'text-[#24a148]');
   if(plan.action === 'CREATE_PR') logLine(`Workflow: ${plan.steps.join(' → ')} → gh pr create --repo ${escapeHtml(state.repo)}`, 'text-[#0f62fe]');
-  if(plan.action === 'RUN_BASH') logLine(`child_process.spawn("${escapeHtml(plan.command)}") → stream stdout/stderr lên TUI`, 'text-[#f1c21b]');
+  if(plan.action === 'RUN_BASH'){
+    if(typeof window.sendClriksCommand !== 'function') return logLine('[ERROR] Terminal backend chưa sẵn sàng.', 'text-[#da1e28]');
+    const sent = window.sendClriksCommand(plan.command + '\n');
+    if(!sent) return logLine('[ERROR] Không thể gửi lệnh đến terminal backend.', 'text-[#da1e28]');
+    logLine(`[Terminal] Đã gửi tới backend: ${escapeHtml(plan.command)}`, 'text-[#f1c21b]');
+  }
   if(plan.action === 'REVIEW_CODE') logLine(`gh pr diff ${escapeHtml(plan.pr)} → LLM review → Octokit pulls.createReview/comment`, 'text-[#24a148]');
 }
 
@@ -602,12 +660,16 @@ document.addEventListener('DOMContentLoaded', () => {
   logLine('Initializing Clriks-cli Agent Console...', 'text-[#8d8d8d]');
   logLine('[OK] Command input, GitHub automation router và localStorage đã sẵn sàng.', 'text-[#24a148]');
   logLine('Gõ "login", "task thêm API", "pr sửa UI", "bash gh pr list" hoặc "review 12".', 'text-white');
-  document.getElementById('command-input').addEventListener('keydown', e => {
-    if(e.key === 'Enter'){ executeCommand(e.target.value); e.target.value = ''; }
-  });
-  document.getElementById('send-command').addEventListener('click', () => {
-    const input = document.getElementById('command-input'); executeCommand(input.value); input.value = ''; input.focus();
-  });
+  window.executeClriksCommand = executeCommand;
+  if(!window.CLRICKS_TERMINAL_CONTROLS_INPUT){
+    document.getElementById('command-input').addEventListener('keydown', e => {
+      if(e.key === 'Enter'){ executeCommand(e.target.value); e.target.value = ''; }
+    });
+    document.getElementById('send-command').addEventListener('click', () => {
+      const input = document.getElementById('command-input'); executeCommand(input.value); input.value = ''; input.focus();
+    });
+  }
+  document.getElementById('connect-github').addEventListener('click', startDeviceFlow);
   document.querySelectorAll('[data-panel]').forEach(btn => btn.addEventListener('click', () => renderPanel(btn.dataset.panel)));
   document.getElementById('open-settings').addEventListener('click', () => toggleSettings(true));
   document.getElementById('close-settings').addEventListener('click', () => toggleSettings(false));
@@ -626,13 +688,15 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('repo-required-message').hidden = false;
       return;
     }
-    state.repo = repository;
-    localStorage.setItem('clriks.repo', state.repo);
-    syncStats();
-    closeTaskDialog();
-    const task = document.getElementById('task-command').value;
-    logLine(`[OK] Đã chọn repository: ${escapeHtml(state.repo)}`, 'text-[#24a148]');
-    executeCommand(task === 'review' ? 'review current' : task === 'pr' ? 'pr cập nhật từ menu' : `bash ${task}`);
+    connectRepository(repository).then(repo => {
+      closeTaskDialog();
+      const task = document.getElementById('task-command').value;
+      logLine(`[OK] Đã kết nối repository: ${escapeHtml(repo.fullName)}`, 'text-[#24a148]');
+      executeCommand(task === 'review' ? 'review current' : task === 'pr' ? 'pr cập nhật từ menu' : `bash ${task}`);
+    }).catch(error => {
+      document.getElementById('repo-required-message').hidden = false;
+      logLine(`[ERROR] Không thể kết nối repository: ${escapeHtml(error.message || String(error))}`, 'text-[#da1e28]');
+    });
   });
   document.addEventListener('keydown', event => {
     if(event.key === 'Escape'){ toggleSettings(false); closeTaskDialog(); }
