@@ -35,6 +35,7 @@
         .form-label { display: block; margin: 16px 0 7px; color: #c6c6c6; font-size: 12px; font-weight: 700; }
         .form-field { width: 100%; border: 1px solid #525252; border-radius: 6px; padding: 10px; color: #f4f4f4; font: inherit; font-size: 14px; background: #262626; }
         .form-field:focus { outline: 2px solid #0f62fe; outline-offset: 1px; }
+        .terminal-input-proxy { position: fixed; width: 1px; height: 1px; opacity: 0; pointer-events: none; border: 0; padding: 0; left: 0; bottom: 0; }
         .repo-required { color: #ffb3b8; font-size: 11px; margin-top: 7px; }
         .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
         .dialog-actions button { padding: 9px 13px; border: 1px solid #525252; border-radius: 6px; font: inherit; font-size: 12px; color: white; background: #262626; }
@@ -221,10 +222,16 @@ html {
         </div>
     </header>
 
-    <section class="glossy-panel h-72 p-3 mb-4 relative overflow-hidden" aria-label="Nhật ký thực thi">
+    <section id="terminal-surface" class="glossy-panel h-72 p-3 mb-4 relative overflow-hidden flex flex-col cursor-text" aria-label="Màn hình Command Prompt. Chạm để nhập lệnh.">
         <div class="absolute top-0 left-0 w-full h-1 bg-[#0f62fe] opacity-50"></div>
-        <div id="terminal-log" class="terminal-scroll h-full overflow-y-auto text-xs space-y-1 pr-1" role="log" aria-live="polite"></div>
+        <div id="terminal-log" class="terminal-scroll flex-1 min-h-0 overflow-y-auto text-xs space-y-1 pr-1" role="log" aria-live="polite"></div>
+        <div id="terminal-composer" class="mt-2 flex items-center gap-1 border-t border-[#393939] pt-2 text-xs text-[#f4f4f4]" aria-live="polite">
+            <span class="text-[#24a148]">u0@termux:~$</span><span id="terminal-buffer" class="min-w-0 flex-1 whitespace-pre-wrap break-all"></span><span class="cursor-blink text-[#0f62fe]">▌</span>
+            <button id="copy-terminal" type="button" class="ml-1 text-[10px] text-[#78a9ff]" aria-label="Sao chép nội dung terminal">Sao chép</button>
+            <button id="paste-terminal" type="button" class="ml-2 text-[10px] text-[#78a9ff]" aria-label="Dán lệnh vào terminal">Dán</button>
+        </div>
     </section>
+    <input id="command-input" class="terminal-input-proxy" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Terminal command">
 
     <section class="grid grid-cols-2 gap-2 mb-4 text-[10px]">
         <div class="glossy-panel p-3"><span class="status-dot bg-[#3fb950]"></span>OAuth Device Flow</div>
@@ -248,13 +255,6 @@ html {
         </button>
     </nav>
 
-    <section class="mt-6">
-        <div class="relative flex gap-2">
-            <span class="absolute left-3 top-3 text-[#0f62fe]">$</span>
-            <input id="command-input" type="text" class="w-full bg-[#161616] border border-[#393939] p-3 pl-8 text-sm focus:outline-none focus:border-[#0f62fe] placeholder-[#525252]" placeholder="Nhập lệnh: ls, pwd, git status, npm test…" autocomplete="off" spellcheck="false" aria-label="Terminal command">
-            <button id="send-command" class="btn-ibm bg-[#0f62fe] px-4 text-sm font-bold" aria-label="Gửi lệnh">↵</button>
-        </div>
-    </section>
 
     <footer class="mt-8 grid grid-cols-3 gap-1 border-t border-[#393939] pt-4">
         <div class="text-center border-r border-[#393939]"><p class="text-[8px] text-[#8d8d8d] uppercase italic">Memory</p><p id="memory-stat" class="text-xs font-bold">256MB</p></div>
@@ -468,6 +468,31 @@ window.appendClriksTerminalOutput = appendClriksTerminalOutput;
 function showMandatoryRules(){
   panels.rules.forEach(item => logLine(escapeHtml(item), item.startsWith('#') ? 'text-white' : 'text-[#f1c21b]'));
 }
+function setTerminalComposer(value){
+  document.getElementById('terminal-buffer').textContent = value || '';
+}
+async function copyTerminalOutput(){
+  const selected = window.getSelection().toString().trim();
+  const text = selected || document.getElementById('terminal-log').innerText;
+  if(!text) return logLine('[ERROR] Chưa có nội dung để sao chép.', 'text-[#da1e28]');
+  try {
+    await navigator.clipboard.writeText(text);
+    logLine('[OK] Đã sao chép nội dung terminal.', 'text-[#24a148]');
+  } catch(error) {
+    logLine('[ERROR] Không thể sao chép. Hãy cấp quyền clipboard cho trình duyệt.', 'text-[#da1e28]');
+  }
+}
+async function pasteTerminalInput(){
+  try {
+    const text = await navigator.clipboard.readText();
+    const input = document.getElementById('command-input');
+    input.value += text;
+    setTerminalComposer(input.value);
+    input.focus({ preventScroll: true });
+  } catch(error) {
+    logLine('[ERROR] Không thể dán. Hãy cấp quyền clipboard cho trình duyệt.', 'text-[#da1e28]');
+  }
+}
 
 function syncStats(){
   document.getElementById('auth-state').textContent = state.token ? (state.account || 'GitHub connected') : 'Guest';
@@ -659,6 +684,13 @@ document.addEventListener('DOMContentLoaded', () => {
   logLine('[OK] Terminal backend, GitHub connector và localStorage đã sẵn sàng.', 'text-[#24a148]');
   logLine('Gõ "rules" để đọc quy tắc bắt buộc, sau đó gõ "accept rules" để bắt đầu.', 'text-white');
   window.executeClriksCommand = executeCommand;
+  const terminalSurface = document.getElementById('terminal-surface');
+  const terminalInput = document.getElementById('command-input');
+  const focusTerminal = () => terminalInput.focus({ preventScroll: true });
+  terminalSurface.addEventListener('click', focusTerminal);
+  terminalInput.addEventListener('input', () => setTerminalComposer(terminalInput.value));
+  document.getElementById('copy-terminal').addEventListener('click', event => { event.stopPropagation(); copyTerminalOutput(); });
+  document.getElementById('paste-terminal').addEventListener('click', event => { event.stopPropagation(); pasteTerminalInput(); });
   if(!window.CLRICKS_TERMINAL_CONTROLS_INPUT){
     document.getElementById('command-input').addEventListener('keydown', e => {
       if(e.key === 'Enter'){ executeCommand(e.target.value); e.target.value = ''; }

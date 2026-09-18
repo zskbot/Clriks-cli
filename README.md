@@ -6,9 +6,9 @@ Command Prompt là giao diện **web shell** mô phỏng trải nghiệm Termux/
 
 ## Tính năng UI hiện có
 
-- Command Prompt web kết nối WebSocket vào Bash PTY của backend, với prompt Termux (`u0@termux:~$`), stdout/stderr thời gian thực, Ctrl+C/Ctrl+D/Ctrl+L, Tab và lịch sử lệnh bằng phím mũi tên.
+- Command Prompt web kết nối WebSocket vào Bash PTY của backend. Chạm bất kỳ vị trí nào trên màn hình terminal đen để mở bàn phím ảo; dòng lệnh được hiển thị trực tiếp trong terminal, không có khung nhập riêng.
 - Package manager demo giống Termux: `pkg update`, `pkg upgrade`, `pkg install`, `pkg remove`, `pkg list`.
-- File-system command demo: `ls`, `pwd`, `cd`, `mkdir`, `touch`, `cat`, `echo`, `clear`.
+- File-system command demo: `ls`, `pwd`, `cd`, `mkdir`, `touch`, `cat`, `echo`, `clear`. Có nút **Sao chép** (vùng chọn hoặc toàn bộ log) và **Dán** (đưa clipboard vào dòng lệnh) trên màn hình terminal.
 - Agent IDE command: `agent task ...`, `agent pr ...`, `review <pr>`, `bash <command>`.
 - Trang/lệnh tự động hóa môi trường: `setup <tiêu đề>` hoặc `env <từ khoá>` để đề xuất stack, package, file scaffold và checklist bảo mật.
 - Menu 3 gạch mở drawer bên phải với các trang Docs, Packages, Agent IDE, Settings, Roadmap và Security.

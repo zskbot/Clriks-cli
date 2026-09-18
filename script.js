@@ -369,6 +369,7 @@ function submitCommand() {
     if (typeof window.executeClriksCommand === 'function') {
         window.executeClriksCommand(value);
         inputElement.value = '';
+        window.setTerminalComposer?.('');
         inputElement.focus();
         return;
     }
@@ -380,6 +381,7 @@ function submitCommand() {
 
     sendTerminalInput(value + '\n');
     inputElement.value = '';
+    window.setTerminalComposer?.('');
     inputElement.focus();
 }
 
@@ -598,6 +600,7 @@ window.clriksSubmitCommand =
 
 window.connectClriksWebSocket =
     connectClriksWebSocket;
+window.focusCommandPrompt = () => inputElement?.focus({ preventScroll: true });
 window.CLRICKS_TERMINAL_CONTROLS_INPUT = true;
 
 /* =========================================================
