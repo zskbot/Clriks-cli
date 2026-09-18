@@ -9,6 +9,8 @@ const CLRICKS_WS_URL =
 
 let clriksSocket = null;
 let clriksReconnectTimer = null;
+let terminalCommandPending = false;
+let terminalCommandTimer = null;
 const terminalHistory = [];
 let terminalHistoryIndex = -1;
 
@@ -89,6 +91,27 @@ function setTerminalConnectionStatus(status) {
         : status === 'CONNECTING'
             ? 'text-[#f1c21b]'
             : 'text-[#da1e28]';
+}
+
+function startTerminalActivity() {
+    terminalCommandPending = true;
+    clearTimeout(terminalCommandTimer);
+    window.setTerminalActivity?.('running');
+    terminalCommandTimer = setTimeout(() => {
+        if (!terminalCommandPending) return;
+        terminalCommandPending = false;
+        window.setTerminalActivity?.('error');
+    }, 30000);
+}
+
+function finishTerminalActivity(output, type) {
+    if (!terminalCommandPending) return;
+    const value = String(output ?? '');
+    const failed = type === 'stderr' || window.isTerminalError?.(value);
+    if (!failed && !value.includes('u0@termux:')) return;
+    terminalCommandPending = false;
+    clearTimeout(terminalCommandTimer);
+    window.setTerminalActivity?.(failed ? 'error' : 'success');
 }
 
 /* =========================================================
@@ -232,14 +255,10 @@ function connectClriksWebSocket() {
                 return;
             }
 
-            appendConsole(
-                response.data ??
-                response.error ??
-                '',
-                type === 'stderr'
-                    ? 'stderr'
-                    : 'stdout'
-            );
+            const output = response.data ?? response.error ?? '';
+            const outputType = type === 'stderr' ? 'stderr' : 'stdout';
+            finishTerminalActivity(output, outputType);
+            appendConsole(output, outputType);
         };
 
     socket.onerror =
@@ -313,6 +332,8 @@ function sendTerminalInput(
 
         return false;
     }
+
+    startTerminalActivity();
 
     socket.send(
         JSON.stringify({

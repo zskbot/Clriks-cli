@@ -36,6 +36,14 @@
         .form-field { width: 100%; border: 1px solid #525252; border-radius: 6px; padding: 10px; color: #f4f4f4; font: inherit; font-size: 14px; background: #262626; }
         .form-field:focus { outline: 2px solid #0f62fe; outline-offset: 1px; }
         .terminal-input-proxy { position: fixed; width: 1px; height: 1px; opacity: 0; pointer-events: none; border: 0; padding: 0; left: 0; bottom: 0; }
+        .terminal-activity { display: inline-flex; align-items: center; gap: 5px; min-width: 72px; justify-content: flex-end; font-size: 10px; font-weight: 700; letter-spacing: .06em; }
+        .terminal-activity.ready { color: #8d8d8d; }
+        .terminal-activity.running { color: #f1c21b; }
+        .terminal-activity.success { color: #24a148; }
+        .terminal-activity.error { color: #ff8389; }
+        .terminal-activity .spinner { width: 9px; height: 9px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 999px; opacity: 0; }
+        .terminal-activity.running .spinner { opacity: 1; animation: terminal-spin .75s linear infinite; }
+        @keyframes terminal-spin { to { transform: rotate(360deg); } }
         .repo-required { color: #ffb3b8; font-size: 11px; margin-top: 7px; }
         .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
         .dialog-actions button { padding: 9px 13px; border: 1px solid #525252; border-radius: 6px; font: inherit; font-size: 12px; color: white; background: #262626; }
@@ -227,6 +235,7 @@ html {
         <div id="terminal-log" class="terminal-scroll flex-1 min-h-0 overflow-y-auto text-xs space-y-1 pr-1" role="log" aria-live="polite"></div>
         <div id="terminal-composer" class="mt-2 flex items-center gap-1 border-t border-[#393939] pt-2 text-xs text-[#f4f4f4]" aria-live="polite">
             <span class="text-[#24a148]">u0@termux:~$</span><span id="terminal-buffer" class="min-w-0 flex-1 whitespace-pre-wrap break-all"></span><span class="cursor-blink text-[#0f62fe]">▌</span>
+            <span id="terminal-activity" class="terminal-activity ready" role="status"><span class="spinner"></span><span class="label">READY</span></span>
             <button id="copy-terminal" type="button" class="ml-1 text-[10px] text-[#78a9ff]" aria-label="Sao chép nội dung terminal">Sao chép</button>
             <button id="paste-terminal" type="button" class="ml-2 text-[10px] text-[#78a9ff]" aria-label="Dán lệnh vào terminal">Dán</button>
         </div>
@@ -453,18 +462,33 @@ function logLine(message, color = 'text-[#8d8d8d]'){
 function stripTerminalControlCodes(value){
   return String(value).replace(/\x1B(?:\[[0-?]*[ -\/]*[@-~]|][^\x07]*(?:\x07|\x1B\\))/g, '').replace(/\r/g, '');
 }
+function isTerminalError(value){
+  return /(?:command not found|no such file|not a git repository|permission denied|syntax error|invalid (?:command|option)|^.*(?:error|failed):)/im.test(value);
+}
+let terminalActivityTimeout;
+function setTerminalActivity(state){
+  const activity = document.getElementById('terminal-activity');
+  if(!activity) return;
+  clearTimeout(terminalActivityTimeout);
+  const labels = { ready: 'READY', running: 'RUNNING', success: 'SUCCESS', error: 'ERROR' };
+  activity.className = `terminal-activity ${state}`;
+  activity.querySelector('.label').textContent = labels[state] || 'READY';
+  if(state === 'success' || state === 'error') terminalActivityTimeout = setTimeout(() => setTerminalActivity('ready'), 1800);
+}
 function appendClriksTerminalOutput(value, type = 'stdout', color){
   const clean = stripTerminalControlCodes(value);
   if(!clean) return;
-  const isError = /(?:command not found|no such file|not a git repository|permission denied|syntax error|invalid (?:command|option)|^.*(?:error|failed):)/im.test(clean);
+  const isError = type === 'stderr' || isTerminalError(clean);
   const line = document.createElement('pre');
-  line.className = `${isError || type === 'stderr' ? 'text-[#da1e28]' : (color || 'text-[#a6e22e]')} m-0 whitespace-pre-wrap break-words font-inherit`;
+  line.className = `${isError ? 'text-[#da1e28]' : (color || 'text-[#24a148]')} m-0 whitespace-pre-wrap break-words font-inherit`;
   line.textContent = clean;
   const log = document.getElementById('terminal-log');
   log.appendChild(line);
   log.scrollTop = log.scrollHeight;
 }
 window.appendClriksTerminalOutput = appendClriksTerminalOutput;
+window.setTerminalActivity = setTerminalActivity;
+window.isTerminalError = isTerminalError;
 function showMandatoryRules(){
   panels.rules.forEach(item => logLine(escapeHtml(item), item.startsWith('#') ? 'text-white' : 'text-[#f1c21b]'));
 }
